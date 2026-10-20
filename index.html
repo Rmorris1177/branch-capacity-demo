@@ -1536,6 +1536,31 @@ td {
   }
 }
 
+.page-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.supplier-picks {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 18px 0;
+}
+.supplier-picks legend {
+  font-size: 12px;
+}
+.supplier-picks small {
+  color: var(--muted);
+  font-size: 11px;
+}
+@media (max-width: 700px) {
+  .page-heading-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
   </style>
   <div class="shell">
     <aside>
@@ -2126,15 +2151,25 @@ function reservationList(p) {
   return `<section class="card section"><div class="card-heading"><h2>Sample reservations (${rows.length})</h2></div><div class="reserve-list">${rows.map((r) => `<div class="supplier row"><div><strong>${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)}</strong><p class="page-subtitle">${r.quarter} · Prototype sample · ${r.selected_by}</p></div>${cancelButton(r)}</div>`).join("") || "<p>No samples reserved yet. Compare partners to begin.</p>"}</div></section>`;
 }
 function supplierTable(p) {
-  return `<section class="card"><div class="card-heading"><h2>Potential suppliers (${state.suppliers.length})</h2><button class="primary" data-go="comparison" aria-label="Compare suppliers">＋ Add supplier</button></div><div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${state.suppliers
+  const candidates = state.suppliers.filter(
+    (s) => !p.supplier_ids || p.supplier_ids.includes(s.id),
+  );
+  return `<section class="card"><div class="card-heading"><h2>Potential suppliers (${candidates.length})</h2><button class="primary" data-go="comparison" aria-label="Compare suppliers">＋ Add supplier</button></div><div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${candidates
     .map((s) => {
       const d = p.supplier_details[String(s.id)],
         reserved = state.reservations.some(
           (r) => r.project_id === p.id && r.supplier_id === s.id,
         );
-      return `<tr><td><button class="link" data-profile="${s.id}">${s.name}</button>${p.shortlist.includes(s.id) ? "<small>Shortlisted</small>" : ""}</td><td>${stagePill(d.stage)} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action)}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${s.name}">•••</button></td></tr>`;
+      return `<tr><td><button class="link" data-profile="${s.id}">${s.name}</button>${p.shortlist.includes(s.id) ? "<small>Shortlisted</small>" : ""}</td><td>${stagePill(d.stage)} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${s.name}">•••</button></td></tr>`;
     })
-    .join("")}</tbody></table></div></section>`;
+    .join(
+      "",
+    )}</tbody></table></div>${candidates.length ? "" : '<p class="empty" style="padding:16px">No supplier candidates yet. Use Add supplier to compare partners.</p>'}</section>`;
+}
+function supplierProjects(s) {
+  return state.projects.filter(
+    (p) => !p.supplier_ids || p.supplier_ids.includes(s.id),
+  );
 }
 function designPage() {
   if (page === "actions") return actionsPage();
@@ -2142,7 +2177,7 @@ function designPage() {
     const ordered = [...state.projects].sort(
       (a, b) => (b.id === 7) - (a.id === 7),
     );
-    return `<div class="row"><h1>${page === "dashboard" ? "Development overview" : "Projects"}</h1><select id="quarter" aria-label="Overview quarter">${state.quarters.map((q) => `<option ${q === quarter ? "selected" : ""}>${q}</option>`).join("")}</select></div>${
+    return `<div class="row"><h1>${page === "dashboard" ? "Development overview" : "Projects"}</h1><div class="page-heading-actions"><button class="primary" id="new-project">＋ New project</button><select id="quarter" aria-label="Overview quarter">${state.quarters.map((q) => `<option ${q === quarter ? "selected" : ""}>${q}</option>`).join("")}</select></div></div>${
       page === "dashboard"
         ? `<div class="stats">${[
             [
@@ -2209,14 +2244,23 @@ function designPage() {
     return `<div class="project-hero">${art(p, true)}<div class="project-heading"><div class="hero-status"><span class="eyebrow">DEMO · Initial concept</span>${projectStage(p)}</div><h1>${esc(p.name)}</h1><div class="project-metadata"><div><small>Owner</small><strong>${esc(p.owner)}</strong></div><div><small>Product area</small><strong>${esc(p.category)}</strong></div><div><small>Target launch</small><strong>${esc(p.target_launch || "2027")}</strong></div></div><p>${esc(p.description)}</p><button id="edit-project" style="margin-top:15px;font-size:11px">Edit brief</button></div></div><div class="project-tabs" role="tablist" aria-label="Project sections">${["overview", "suppliers", "schedule", "history"].map((t) => `<button role="tab" data-tab="${t}" class="${projectTab === t ? "active" : ""}" aria-selected="${projectTab === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div><div class="project-content"><div>${content}</div><div><section class="card"><div class="row"><h2>Next actions (${projectActions(p).length})</h2><button class="quiet-link" data-open-actions="${p.id}">View all</button></div>${nextActions(p)}</section>${agentCard(p)}</div></div>`;
   }
   if (page === "suppliers")
-    return `<div class="row"><h1>Supplier partners</h1><span class="pill">${state.suppliers.length} development partners</span></div><p class="page-subtitle">A shared view of relationships, development work, and next steps.</p><div class="compare">${state.suppliers.map((s) => `<section class="card"><span class="eyebrow">${s.location}</span><h2>${s.name}</h2><p>${s.specialty}</p>${badge(s)}<div class="metric"><small>Development pipeline</small><strong>${state.projects.length} projects</strong></div><button class="primary" data-profile="${s.id}">View supplier →</button></section>`).join("")}</div>`;
+    return `<div class="row"><h1>Supplier partners</h1><span class="pill">${state.suppliers.length} development partners</span></div><p class="page-subtitle">A shared view of relationships, development work, and next steps.</p><div class="compare">${state.suppliers.map((s) => `<section class="card"><span class="eyebrow">${s.location}</span><h2>${s.name}</h2><p>${s.specialty}</p>${badge(s)}<div class="metric"><small>Development pipeline</small><strong>${supplierProjects(s).length} projects</strong></div><button class="primary" data-profile="${s.id}">View supplier →</button></section>`).join("")}</div>`;
   if (page === "supplier") {
     const s = supplier(),
       rs = reservations(s);
     return `<div class="row"><div><span class="eyebrow">Suppliers / ${s.name}</span><h1>${s.name}</h1></div><span class="pill good"><span class="dot"></span>Development partner</span></div><div class="project-tabs">${["Overview", "Projects", "Communications", "Files"].map((t) => `<button data-supplier-tab="${t}" class="${supplierTab === t ? "active" : ""}">${t}</button>`).join("")}</div>${
       supplierTab === "Communications" || supplierTab === "Files"
         ? `<section class="card"><h2>${supplierTab}</h2><p>${supplierTab === "Files" ? "No files attached in this fictional demo." : "No messages have been sent. The tracking assistant prepares internal follow-up suggestions for review."}</p></section>`
-        : `<div class="supplier-profile"><section class="card"><div class="row"><h2>Sourcing pipeline</h2><span class="quiet-link">${state.projects.length} projects</span></div>${state.projects.map((p) => `<div class="pipeline-row">${art(p)}<div><button class="link" data-project="${p.id}">${esc(p.name)}</button><small>${stagePill(p.supplier_details[String(s.id)].stage)}</small><small>Target launch ${esc(p.target_launch || "2027")}</small></div><button class="link" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>`).join("")}</section><div><section class="card"><h2>Reserved development</h2>${
+        : `<div class="supplier-profile"><section class="card"><div class="row"><h2>Sourcing pipeline</h2><span class="quiet-link">${supplierProjects(s).length} projects</span></div>${supplierProjects(
+            s,
+          )
+            .map(
+              (p) =>
+                `<div class="pipeline-row">${art(p)}<div><button class="link" data-project="${p.id}">${esc(p.name)}</button><small>${stagePill(p.supplier_details[String(s.id)].stage)}</small><small>Target launch ${esc(p.target_launch || "2027")}</small></div><button class="link" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>`,
+            )
+            .join(
+              "",
+            )}</section><div><section class="card"><h2>Reserved development</h2>${
             rs
               .map((r) => {
                 const p = state.projects.find((p) => p.id === r.project_id);
@@ -2370,6 +2414,7 @@ function openAgent() {
   $("#agent-question").focus();
 }
 function bindDesign() {
+  if ($("#new-project")) $("#new-project").onclick = newProject;
   bindActionCenter();
   const navPage = [
     "project",
@@ -2643,6 +2688,45 @@ function bindActionCenter() {
       }),
   );
 }
+function newProject() {
+  const dialog = $("#planning-dialog"),
+    requestId = crypto.randomUUID();
+  const [year, q] = quarter.split("-Q").map(Number),
+    quarterStart = `${year}-${String((q - 1) * 3 + 1).padStart(2, "0")}-01`;
+  const end = new Date(Date.UTC(year, q * 3, 0)).toISOString().slice(0, 10),
+    start =
+      todayLocal() >= quarterStart && todayLocal() <= end
+        ? todayLocal()
+        : quarterStart;
+  const sample = new Date(end + "T12:00:00Z");
+  sample.setUTCDate(sample.getUTCDate() - 14);
+  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief. Add supplier candidates now or later; sample selection reserves capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner">${state.people.map((n) => `<option ${n === "Ryan Morris" ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div><label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2030-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2030-12-31" value="${end}"></div></div><label for="new-sample">Sample target</label><input id="new-sample" name="sample_due" type="date" required min="2026-01-01" max="2030-12-31" value="${sample.toISOString().slice(0, 10)}"><fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${s.name} <small>· ${s.specialty}</small></label>`).join("")}<small>These are candidates only. No sample reservations are created.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
+  dialog.showModal();
+  $("#cancel-new-project").onclick = () => dialog.close();
+  $("#new-project-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target),
+      body = Object.fromEntries(form);
+    body.request_id = requestId;
+    body.target_launch = Number(body.target_launch);
+    body.supplier_ids = form.getAll("supplier_ids").map(Number);
+    $("#create-project").disabled = true;
+    try {
+      const created = await api("/api/projects", body);
+      state = await api("/api/state");
+      projectId = created.id;
+      projectTab = "overview";
+      dialog.close();
+      go("project");
+      showNotice(
+        "Project created. Add supplier candidates to begin development.",
+      );
+    } catch (error) {
+      $("#dialog-error").textContent = error.message;
+      $("#create-project").disabled = false;
+    }
+  };
+}
 
 // Used only by the explicitly labeled standalone preview, never the hosted app.
 const PREVIEW_STORAGE_KEY = "branch-fictional-preview-v1";
@@ -2661,6 +2745,7 @@ try {
 }
 function hydratePreview() {
   previewData.history ||= [];
+  previewData.creation_requests ||= {};
   previewData.supplier_stages ||= previewSeed.supplier_stages;
   for (const p of previewData.projects) {
     p.supplier_details ||= structuredClone(
@@ -2740,7 +2825,106 @@ api = async function previewApi(url, body, method = "POST") {
   hydratePreview();
   if (url === "/api/state") {
     previewCapacity();
-    return structuredClone(previewData);
+    const { creation_requests, ...view } = previewData;
+    return structuredClone(view);
+  }
+  if (url === "/api/projects") {
+    if (!/^[0-9a-f-]{36}$/i.test(body.request_id || ""))
+      previewFailure(422, "Invalid creation request");
+    const fingerprint = JSON.stringify(
+      Object.fromEntries(
+        Object.entries(body).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+    );
+    const previous = previewData.creation_requests[body.request_id];
+    if (previous) {
+      if (previous.payload !== fingerprint)
+        previewFailure(
+          409,
+          "This creation request was already used. Reopen New project to start another.",
+        );
+      return { id: previous.project_id };
+    }
+    if (
+      !body.name?.trim() ||
+      body.name.trim().length > 120 ||
+      !body.category?.trim() ||
+      body.category.trim().length > 80 ||
+      typeof body.description !== "string" ||
+      body.description.length > 4000 ||
+      !previewData.people.includes(body.owner) ||
+      !previewData.statuses.includes(body.status)
+    )
+      previewFailure(
+        422,
+        "Complete the project name, product area, person, and stage.",
+      );
+    if (
+      !Number.isInteger(body.target_launch) ||
+      body.target_launch < 2026 ||
+      body.target_launch > 2035 ||
+      body.target_launch < Number(body.development_end.slice(0, 4))
+    )
+      previewFailure(
+        422,
+        "Choose a launch year on or after development completion",
+      );
+    const dates = [
+      body.development_start,
+      body.sample_due,
+      body.development_end,
+    ];
+    if (
+      dates.some(
+        (d) =>
+          !/^\d{4}-\d{2}-\d{2}$/.test(d) || !Number.isFinite(Date.parse(d)),
+      ) ||
+      !(
+        dates[0] >= "2026-01-01" &&
+        dates[0] <= dates[1] &&
+        dates[1] <= dates[2] &&
+        dates[2] <= "2030-12-31"
+      )
+    )
+      previewFailure(
+        422,
+        "Use dates between 2026 and 2030, with the sample target inside the development window",
+      );
+    if (
+      !Array.isArray(body.supplier_ids) ||
+      new Set(body.supplier_ids).size !== body.supplier_ids.length ||
+      body.supplier_ids.some(
+        (id) => !previewData.suppliers.some((s) => s.id === id),
+      )
+    )
+      previewFailure(422, "Choose distinct listed suppliers");
+    const id = Math.max(0, ...previewData.projects.map((p) => p.id)) + 1;
+    const { request_id, ...fields } = body;
+    previewData.projects.push({
+      ...fields,
+      id,
+      version: 1,
+      shortlist: [...body.supplier_ids],
+      supplier_details: Object.fromEntries(
+        previewData.suppliers.map((s) => [
+          String(s.id),
+          {
+            stage: "Discussions",
+            next_action: "",
+            due_date: body.sample_due,
+            completed: false,
+            updated_on: todayLocal(),
+          },
+        ]),
+      ),
+    });
+    previewData.creation_requests[request_id] = {
+      project_id: id,
+      payload: fingerprint,
+    };
+    previewEvent(id, "Created project: " + body.name);
+    persistPreview();
+    return { id };
   }
   if (url === "/api/agent/analyze") {
     const projects = previewData.projects.filter(
@@ -2853,6 +3037,10 @@ api = async function previewApi(url, body, method = "POST") {
       )
         previewFailure(422, "Choose distinct listed suppliers");
       p.shortlist = [...body.supplier_ids];
+      if (p.supplier_ids)
+        p.supplier_ids = [
+          ...new Set([...p.supplier_ids, ...body.supplier_ids]),
+        ];
     } else {
       if (
         !body.name?.trim() ||
@@ -2929,6 +3117,14 @@ api = async function previewApi(url, body, method = "POST") {
         409,
         "This sample already has a reservation for this quarter",
       );
+    const project = previewData.projects.find((p) => p.id === body.project_id);
+    if (
+      project.supplier_ids &&
+      !project.supplier_ids.includes(body.supplier_id)
+    ) {
+      project.supplier_ids.push(body.supplier_id);
+      project.version++;
+    }
     previewData.reservations.push({
       project_id: body.project_id,
       supplier_id: body.supplier_id,
