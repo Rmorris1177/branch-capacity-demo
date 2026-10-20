@@ -1783,7 +1783,7 @@ td {
         .forEach((b) => b.classList.toggle("active", b.dataset.page === page));
       let html = "";
       if (page === "dashboard" || page === "projects") {
-        html = `<div class="row"><div><div class="eyebrow">Branch / Development planning</div><h1>${page === "dashboard" ? "A little clarity. A lot of possibility." : "Projects in motion."}</h1><p>Bring projects, suppliers, and development capacity into view.</p></div><span class="pill">${quarter}</span></div>${page === "dashboard" ? `<div class="stats"><div class="card stat">Active projects<strong>${state.projects.filter((p) => p.status !== "Complete").length}</strong><small>Across the workspace</small></div><div class="card stat">Supplier partners<strong>3</strong><small>Open for comparison</small></div><div class="card stat">Sample reservations<strong>${state.reservations.length}</strong><small>Across all quarters</small></div><div class="card stat">Needs a conversation<strong>${state.suppliers.filter((s) => limit(s) === null || load(s) > limit(s)).length}</strong><small>Capacity to review this quarter</small></div></div>` : ""}<div class="${page === "dashboard" ? "grid section" : "section"}"><section class="card"><div class="row"><h2>Project overview</h2><span class="eyebrow">6 projects</span></div>${projectTable()}</section>${page === "dashboard" ? `<section class="card"><div class="eyebrow">${quarter} snapshot</div><h2 style="margin-top:8px">Room to grow?</h2><p>A shared look at supplier development workload.</p>${state.suppliers.map((s) => `<div class="supplier"><div class="row"><strong>${s.name}</strong>${badge(s)}</div>${bar(s)}<small>${load(s)} scheduled / ${limit(s) === null ? "limit not assessed" : limit(s) + " project slots"}</small></div>`).join("")}<button style="margin-top:20px;width:100%" data-go="workload">Explore supplier workload →</button></section>` : ""}</div>`;
+        html = `<div class="row"><div><div class="eyebrow">Branch / Development planning</div><h1>${page === "dashboard" ? "A little clarity. A lot of possibility." : "Projects in motion."}</h1><p>Bring projects, suppliers, and development capacity into view.</p></div><span class="pill">${quarter}</span></div>${page === "dashboard" ? `<div class="stats"><div class="card stat">Active projects<strong>${state.projects.filter((p) => p.status !== "Complete").length}</strong><small>Across the workspace</small></div><div class="card stat">Supplier partners<strong>3</strong><small>Open for comparison</small></div><div class="card stat">Sample reservations<strong>${state.reservations.length}</strong><small>Across all quarters</small></div><div class="card stat">Needs a conversation<strong>${state.suppliers.filter((s) => limit(s) === null || load(s) > limit(s)).length}</strong><small>Capacity to review this quarter</small></div></div>` : ""}<div class="${page === "dashboard" ? "grid section" : "section"}"><section class="card"><div class="row"><h2>Project overview</h2><span class="eyebrow">6 projects</span></div>${projectTable()}</section>${page === "dashboard" ? `<section class="card"><div class="eyebrow">${quarter} snapshot</div><h2 style="margin-top:8px">Room to grow?</h2><p>A shared look at supplier development workload.</p>${state.suppliers.map((s) => `<div class="supplier"><div class="row"><strong>${esc(s.name)}</strong>${badge(s)}</div>${bar(s)}<small>${load(s)} scheduled / ${limit(s) === null ? "limit not assessed" : limit(s) + " project slots"}</small></div>`).join("")}<button style="margin-top:20px;width:100%" data-go="workload">Explore supplier workload →</button></section>` : ""}</div>`;
       }
       if (page === "project") {
         let p = selected();
@@ -1793,7 +1793,7 @@ td {
                 .filter((r) => r.project_id === projectId)
                 .map(
                   (r) =>
-                    `<div class="supplier"><strong>${state.suppliers.find((s) => s.id === r.supplier_id).name}</strong> <span class="pill good">${r.quarter} · Reserved</span><p>Prototype sample · ${r.selected_by}</p>${cancelButton(r)}</div>`,
+                    `<div class="supplier"><strong>${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)}</strong> <span class="pill good">${r.quarter} · Reserved</span><p>Prototype sample · ${r.selected_by}</p>${cancelButton(r)}</div>`,
                 )
                 .join("")
             : "<p>No samples reserved yet. Compare partners to begin.</p>"
@@ -1808,21 +1808,21 @@ td {
           .join("")}</section></div>`;
       }
       if (page === "comparison") {
-        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><h1>Find the right fit.</h1><p>Compare candidate partners and save a shortlist. Shortlisting does not reserve capacity.</p><span class="pill">${selected().shortlist.length} shortlisted</span>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${s.location}</div><h2>${s.name}</h2><p>${s.specialty}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample reserved</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div><div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button class="primary" data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
+        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Find the right fit.</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Compare candidate partners and save a shortlist. Shortlisting does not reserve capacity.</p><span class="pill">${selected().shortlist.length} shortlisted</span>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample reserved</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div><div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button class="primary" data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
       }
       if (page === "preview" || page === "selection") {
         let s = supplier(),
           exists = reservations(s).some((r) => r.project_id === projectId);
-        html = `<button class="back" data-go="${page === "preview" ? "comparison" : "preview"}">← ${page === "preview" ? "Supplier comparison" : "Capacity preview"}</button><div class="eyebrow">${esc(selected().name)} / ${s.name}</div><h1>${page === "preview" ? "See the impact before you commit." : "Choose a sample. Hold a place."}</h1>${steps()}<section class="card wide"><div class="row"><h2>${s.name}</h2><select id="quarter" aria-label="Reservation quarter">${state.quarters.map((q) => `<option ${q === quarter ? "selected" : ""}>${q}</option>`).join("")}</select></div><p>${s.specialty} · ${s.location}</p><div class="split"><div class="metric"><small>Current workload</small><strong>${load(s)} projects</strong></div><div class="metric"><small>After sample selection</small><strong>${load(s) + (exists ? 0 : 1)} projects ${badge(s, exists ? 0 : 1)}</strong></div></div>${bar(s, exists ? 0 : 1)}<div class="callout">${limit(s) === null ? "Capacity is not assessed. Confirm availability with the supplier." : load(s) + (exists ? 0 : 1) > limit(s) ? "This reservation exceeds the assessed limit. Discuss timing with the supplier; this is a planning warning and does not block a reservation." : "There is room within the illustrative assessed development limit."}</div><p>Each project counts once per supplier per quarter. These fictional counts measure development projects, not production units or peak effort. Background workload is illustrative.</p>${page === "selection" ? `<div class="metric"><strong>Prototype sample · ${esc(selected().name)}</strong><small>One development slot · ${quarter} · Selected by Ryan Morris</small></div><p><label><input type="checkbox" id="ack"> I have reviewed the capacity impact and want to reserve this sample.</label></p><button id="reserve" class="primary" ${exists ? "disabled" : ""}>${exists ? "Already reserved" : "Select sample & reserve capacity →"}</button>` : `<button class="primary" data-go="selection">Continue to sample selection →</button>`}<p id="error" role="alert"></p></section>`;
+        html = `<button class="back" data-go="${page === "preview" ? "comparison" : "preview"}">← ${page === "preview" ? "Supplier comparison" : "Capacity preview"}</button><div class="eyebrow">${esc(selected().name)} / ${esc(s.name)}</div><h1>${page === "preview" ? "See the impact before you commit." : "Choose a sample. Hold a place."}</h1>${steps()}<section class="card wide"><div class="row"><h2>${esc(s.name)}</h2><select id="quarter" aria-label="Reservation quarter">${state.quarters.map((q) => `<option ${q === quarter ? "selected" : ""}>${q}</option>`).join("")}</select></div><p>${esc(s.specialty)} · ${esc(s.location)}</p><div class="split"><div class="metric"><small>Current workload</small><strong>${load(s)} projects</strong></div><div class="metric"><small>After sample selection</small><strong>${load(s) + (exists ? 0 : 1)} projects ${badge(s, exists ? 0 : 1)}</strong></div></div>${bar(s, exists ? 0 : 1)}<div class="callout">${limit(s) === null ? "Capacity is not assessed. Confirm availability with the supplier." : load(s) + (exists ? 0 : 1) > limit(s) ? "This reservation exceeds the assessed limit. Discuss timing with the supplier; this is a planning warning and does not block a reservation." : "There is room within the illustrative assessed development limit."}</div><p>Each project counts once per supplier per quarter. These fictional counts measure development projects, not production units or peak effort. Background workload is illustrative.</p>${page === "selection" ? `<div class="metric"><strong>Prototype sample · ${esc(selected().name)}</strong><small>One development slot · ${quarter} · Selected by Ryan Morris</small></div><p><label><input type="checkbox" id="ack"> I have reviewed the capacity impact and want to reserve this sample.</label></p><button id="reserve" class="primary" ${exists ? "disabled" : ""}>${exists ? "Already reserved" : "Select sample & reserve capacity →"}</button>` : `<button class="primary" data-go="selection">Continue to sample selection →</button>`}<p id="error" role="alert"></p></section>`;
       }
       if (page === "confirmed") {
-        html = `<section class="card wide"><div class="check">✓</div><div class="eyebrow">Sample selected</div><h1>A place in the plan.</h1><p>${esc(selected().name)} now has a sample reservation with ${supplier().name} for ${quarter}.</p><p>The reservation has been saved to the separate browser demo database.</p><button class="primary" data-go="workload">View supplier workload →</button> <button data-go="comparison">Compare another supplier</button></section>`;
+        html = `<section class="card wide"><div class="check">✓</div><div class="eyebrow">Sample selected</div><h1>A place in the plan.</h1><p>${esc(selected().name)} now has a sample reservation with ${esc(supplier().name)} for ${quarter}.</p><p>The reservation has been saved to the separate browser demo database.</p><button class="primary" data-go="workload">View supplier workload →</button> <button data-go="comparison">Compare another supplier</button></section>`;
       }
       if (page === "workload") {
         html = `<div class="row"><div><div class="eyebrow">Shared planning / All projects</div><h1>One view. Everyone’s workload.</h1><p>Sample reservations sit alongside illustrative background development work.</p></div><select id="quarter" aria-label="Workload quarter">${state.quarters.map((q) => `<option ${q === quarter ? "selected" : ""}>${q}</option>`).join("")}</select></div><div class="compare">${state.suppliers
           .map(
             (s) =>
-              `<section class="card"><h2>${s.name}</h2><p>${s.location} · ${quarter}</p>${badge(s)}<div class="metric"><small>Scheduled / assessed limit</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div><p>${assessment(s).background} illustrative background projects</p>${
+              `<section class="card"><h2>${esc(s.name)}</h2><p>${esc(s.location)} · ${quarter}</p>${badge(s)}<div class="metric"><small>Scheduled / assessed limit</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div><p>${assessment(s).background} illustrative background projects</p>${
                 reservations(s).length
                   ? reservations(s)
                       .map(
@@ -1939,7 +1939,7 @@ td {
     function releaseReservation(token) {
       const r = state.reservations.find((r) => r.token === token),
         dialog = $("#planning-dialog");
-      dialog.innerHTML = `<h2 id="dialog-title">Release this reservation?</h2><p>${esc(state.projects.find((p) => p.id === r.project_id).name)} · ${state.suppliers.find((s) => s.id === r.supplier_id).name} · ${r.quarter}</p><div class="callout">This frees one reserved development slot. The project and other supplier reservations stay in the plan.</div><p id="dialog-error" role="alert"></p><div class="actions"><button id="keep-reservation">Keep reservation</button><button class="primary" id="confirm-release">Release reservation</button></div>`;
+      dialog.innerHTML = `<h2 id="dialog-title">Release this reservation?</h2><p>${esc(state.projects.find((p) => p.id === r.project_id).name)} · ${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)} · ${r.quarter}</p><div class="callout">This frees one reserved development slot. The project and other supplier reservations stay in the plan.</div><p id="dialog-error" role="alert"></p><div class="actions"><button id="keep-reservation">Keep reservation</button><button class="primary" id="confirm-release">Release reservation</button></div>`;
       dialog.showModal();
       $("#keep-reservation").onclick = () => dialog.close();
       $("#confirm-release").onclick = async () => {
@@ -2150,26 +2150,27 @@ function reservationList(p) {
   const rows = state.reservations.filter((r) => r.project_id === p.id);
   return `<section class="card section"><div class="card-heading"><h2>Sample reservations (${rows.length})</h2></div><div class="reserve-list">${rows.map((r) => `<div class="supplier row"><div><strong>${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)}</strong><p class="page-subtitle">${r.quarter} · Prototype sample · ${r.selected_by}</p></div>${cancelButton(r)}</div>`).join("") || "<p>No samples reserved yet. Compare partners to begin.</p>"}</div></section>`;
 }
+function projectSupplierIds(p) {
+  return p.supplier_ids || [1, 2, 3];
+}
 function supplierTable(p) {
-  const candidates = state.suppliers.filter(
-    (s) => !p.supplier_ids || p.supplier_ids.includes(s.id),
+  const candidates = state.suppliers.filter((s) =>
+    projectSupplierIds(p).includes(s.id),
   );
-  return `<section class="card"><div class="card-heading"><h2>Potential suppliers (${candidates.length})</h2><button class="primary" data-go="comparison" aria-label="Compare suppliers">＋ Add supplier</button></div><div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${candidates
+  return `<section class="card"><div class="card-heading"><h2>Potential suppliers (${candidates.length})</h2><div class="page-heading-actions"><button id="new-supplier">＋ New supplier</button><button class="primary" data-go="comparison" aria-label="Compare suppliers">Add existing supplier</button></div></div><div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${candidates
     .map((s) => {
       const d = p.supplier_details[String(s.id)],
         reserved = state.reservations.some(
           (r) => r.project_id === p.id && r.supplier_id === s.id,
         );
-      return `<tr><td><button class="link" data-profile="${s.id}">${s.name}</button>${p.shortlist.includes(s.id) ? "<small>Shortlisted</small>" : ""}</td><td>${stagePill(d.stage)} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${s.name}">•••</button></td></tr>`;
+      return `<tr><td><button class="link" data-profile="${s.id}">${esc(s.name)}</button>${p.shortlist.includes(s.id) ? "<small>Shortlisted</small>" : ""}</td><td>${stagePill(d.stage)} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${esc(s.name)}">•••</button></td></tr>`;
     })
     .join(
       "",
     )}</tbody></table></div>${candidates.length ? "" : '<p class="empty" style="padding:16px">No supplier candidates yet. Use Add supplier to compare partners.</p>'}</section>`;
 }
 function supplierProjects(s) {
-  return state.projects.filter(
-    (p) => !p.supplier_ids || p.supplier_ids.includes(s.id),
-  );
+  return state.projects.filter((p) => projectSupplierIds(p).includes(s.id));
 }
 function designPage() {
   if (page === "actions") return actionsPage();
@@ -2206,7 +2207,7 @@ function designPage() {
             )
             .join("")}</div>`
         : ""
-    }<div class="dashboard-layout"><section><div class="row"><h2>Projects</h2><input class="search-projects" id="project-search" type="search" aria-label="Search projects" placeholder="Search projects…"></div><div id="project-results" class="project-list">${projectRows(ordered)}</div></section><section><div class="card"><div class="row"><h2>Next actions</h2><button class="quiet-link" data-open-actions="">View all</button></div>${nextActions(null, 3)}</div>${agentCard(null)}<div class="card section"><div class="row"><h2>Quarterly capacity</h2><button class="quiet-link" data-go="workload">View details</button></div>${state.suppliers.map((s) => `<div class="supplier"><div class="row"><small>${s.name}</small>${badge(s)}</div>${bar(s)}<small>${load(s)} scheduled · ${limit(s) ?? "Not assessed"} ${limit(s) === null ? "" : "slots"}</small></div>`).join("")}</div></section></div>`;
+    }<div class="dashboard-layout"><section><div class="row"><h2>Projects</h2><input class="search-projects" id="project-search" type="search" aria-label="Search projects" placeholder="Search projects…"></div><div id="project-results" class="project-list">${projectRows(ordered)}</div></section><section><div class="card"><div class="row"><h2>Next actions</h2><button class="quiet-link" data-open-actions="">View all</button></div>${nextActions(null, 3)}</div>${agentCard(null)}<div class="card section"><div class="row"><h2>Quarterly capacity</h2><button class="quiet-link" data-go="workload">View details</button></div>${state.suppliers.map((s) => `<div class="supplier"><div class="row"><small>${esc(s.name)}</small>${badge(s)}</div>${bar(s)}<small>${load(s)} scheduled · ${limit(s) ?? "Not assessed"} ${limit(s) === null ? "" : "slots"}</small></div>`).join("")}</div></section></div>`;
   }
   if (page === "project") {
     const p = selected();
@@ -2244,11 +2245,11 @@ function designPage() {
     return `<div class="project-hero">${art(p, true)}<div class="project-heading"><div class="hero-status"><span class="eyebrow">DEMO · Initial concept</span>${projectStage(p)}</div><h1>${esc(p.name)}</h1><div class="project-metadata"><div><small>Owner</small><strong>${esc(p.owner)}</strong></div><div><small>Product area</small><strong>${esc(p.category)}</strong></div><div><small>Target launch</small><strong>${esc(p.target_launch || "2027")}</strong></div></div><p>${esc(p.description)}</p><button id="edit-project" style="margin-top:15px;font-size:11px">Edit brief</button></div></div><div class="project-tabs" role="tablist" aria-label="Project sections">${["overview", "suppliers", "schedule", "history"].map((t) => `<button role="tab" data-tab="${t}" class="${projectTab === t ? "active" : ""}" aria-selected="${projectTab === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div><div class="project-content"><div>${content}</div><div><section class="card"><div class="row"><h2>Next actions (${projectActions(p).length})</h2><button class="quiet-link" data-open-actions="${p.id}">View all</button></div>${nextActions(p)}</section>${agentCard(p)}</div></div>`;
   }
   if (page === "suppliers")
-    return `<div class="row"><h1>Supplier partners</h1><span class="pill">${state.suppliers.length} development partners</span></div><p class="page-subtitle">A shared view of relationships, development work, and next steps.</p><div class="compare">${state.suppliers.map((s) => `<section class="card"><span class="eyebrow">${s.location}</span><h2>${s.name}</h2><p>${s.specialty}</p>${badge(s)}<div class="metric"><small>Development pipeline</small><strong>${supplierProjects(s).length} projects</strong></div><button class="primary" data-profile="${s.id}">View supplier →</button></section>`).join("")}</div>`;
+    return `<div class="row"><h1>Supplier partners</h1><div class="page-heading-actions"><span class="pill">${state.suppliers.length} development partners</span><button class="primary" id="new-supplier">＋ New supplier</button></div></div><p class="page-subtitle">A shared view of relationships, development work, and next steps.</p><div class="compare">${state.suppliers.map((s) => `<section class="card"><span class="eyebrow">${esc(s.location)}</span><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p>${badge(s)}<div class="metric"><small>Development pipeline</small><strong>${supplierProjects(s).length} projects</strong></div><button class="primary" data-profile="${s.id}">View supplier →</button></section>`).join("")}</div>`;
   if (page === "supplier") {
     const s = supplier(),
       rs = reservations(s);
-    return `<div class="row"><div><span class="eyebrow">Suppliers / ${s.name}</span><h1>${s.name}</h1></div><span class="pill good"><span class="dot"></span>Development partner</span></div><div class="project-tabs">${["Overview", "Projects", "Communications", "Files"].map((t) => `<button data-supplier-tab="${t}" class="${supplierTab === t ? "active" : ""}">${t}</button>`).join("")}</div>${
+    return `<div class="row"><div><span class="eyebrow">Suppliers / ${esc(s.name)}</span><h1>${esc(s.name)}</h1></div><div class="page-heading-actions"><span class="pill good"><span class="dot"></span>Development partner</span><button id="link-supplier">Add to project</button></div></div><div class="project-tabs">${["Overview", "Projects", "Communications", "Files"].map((t) => `<button data-supplier-tab="${t}" class="${supplierTab === t ? "active" : ""}">${t}</button>`).join("")}</div>${
       supplierTab === "Communications" || supplierTab === "Files"
         ? `<section class="card"><h2>${supplierTab}</h2><p>${supplierTab === "Files" ? "No files attached in this fictional demo." : "No messages have been sent. The tracking assistant prepares internal follow-up suggestions for review."}</p></section>`
         : `<div class="supplier-profile"><section class="card"><div class="row"><h2>Sourcing pipeline</h2><span class="quiet-link">${supplierProjects(s).length} projects</span></div>${supplierProjects(
@@ -2281,7 +2282,7 @@ function designPage() {
 function openTracking(project, sid, suggestion, completedOverride) {
   const d = project.supplier_details[String(sid)],
     dialog = $("#planning-dialog");
-  dialog.innerHTML = `<form id="tracking-form"><h2 id="dialog-title">Update supplier follow-up</h2><p>${esc(project.name)} · ${state.suppliers.find((s) => s.id === sid).name}</p>${suggestion ? '<div class="callout">Assistant suggestion · Review and edit before saving. No message will be sent.</div>' : ""}<label for="tracking-stage">Supplier stage</label><select id="tracking-stage" name="stage">${state.supplier_stages.map((stage) => `<option ${stage === d.stage ? "selected" : ""}>${stage}</option>`).join("")}</select><label for="tracking-action">Next action</label><textarea id="tracking-action" name="next_action" required maxlength="500">${esc(suggestion || d.next_action)}</textarea><label for="tracking-due">Due date</label><input id="tracking-due" type="date" name="due_date" required min="2026-01-01" max="2030-12-31" value="${d.due_date}"><label><input type="checkbox" name="completed" ${(completedOverride ?? d.completed) ? "checked" : ""}> Mark action completed</label><p id="dialog-error" role="alert"></p><button type="button" id="reload-tracking" hidden>Load latest follow-up (discard edits)</button><div class="actions"><button id="cancel-tracking" type="button">Cancel</button><button class="primary" id="save-tracking">Save follow-up</button></div></form>`;
+  dialog.innerHTML = `<form id="tracking-form"><h2 id="dialog-title">Update supplier follow-up</h2><p>${esc(project.name)} · ${esc(state.suppliers.find((s) => s.id === sid).name)}</p>${suggestion ? '<div class="callout">Assistant suggestion · Review and edit before saving. No message will be sent.</div>' : ""}<label for="tracking-stage">Supplier stage</label><select id="tracking-stage" name="stage">${state.supplier_stages.map((stage) => `<option ${stage === d.stage ? "selected" : ""}>${stage}</option>`).join("")}</select><label for="tracking-action">Next action</label><textarea id="tracking-action" name="next_action" required maxlength="500">${esc(suggestion || d.next_action)}</textarea><label for="tracking-due">Due date</label><input id="tracking-due" type="date" name="due_date" required min="2026-01-01" max="2030-12-31" value="${d.due_date}"><label><input type="checkbox" name="completed" ${(completedOverride ?? d.completed) ? "checked" : ""}> Mark action completed</label><p id="dialog-error" role="alert"></p><button type="button" id="reload-tracking" hidden>Load latest follow-up (discard edits)</button><div class="actions"><button id="cancel-tracking" type="button">Cancel</button><button class="primary" id="save-tracking">Save follow-up</button></div></form>`;
   if (!dialog.open) dialog.showModal();
   $("#reload-tracking").onclick = async () => {
     try {
@@ -2349,7 +2350,7 @@ function agentEvidence() {
 }
 function drawAgent() {
   const panel = $("#tracking-agent");
-  panel.innerHTML = `<div class="agent-head"><div class="row"><div><h2>✧ Branch AI</h2><span class="agent-mode">${agentResult?.mode === "live" ? "Live AI · Project tracking" : "Demo insights · Project tracking"}</span></div><button id="close-agent" aria-label="Close tracking assistant">×</button></div><p>Keep projects moving, one follow-up at a time.</p><small class="agent-scope">${agentScope === null ? "All projects" : esc(state.projects.find((p) => p.id === agentScope)?.name || "Project")} · Saved project data</small><textarea id="agent-question" aria-label="Ask the tracking assistant" placeholder="Summarize status and flag overdue actions…"></textarea><div class="agent-question"><button class="primary" id="analyze-project" ${agentBusy ? "disabled" : ""}>${agentBusy ? "Reviewing…" : "Review project status"}</button></div></div><div class="agent-content" id="agent-content">${agentBusy ? '<p role="status">Reviewing saved project status and supplier actions…</p>' : agentResult ? `<p>${esc(agentResult.summary)}</p>${agentEvidence()}<span class="eyebrow">${agentResult.mode === "live" ? "AI suggestions" : "Suggested follow-ups · demo analysis"}</span>${agentResult.suggested_followups.map((f, i) => `<div class="suggestion"><small>${esc(state.projects.find((p) => p.id === f.project_id)?.name || "Project")} · ${state.suppliers.find((s) => s.id === f.supplier_id)?.name || "Supplier"}</small><p>${esc(f.message)}</p><button data-review-suggestion="${i}">Review follow-up →</button></div>`).join("") || "<p>No overdue follow-ups to suggest.</p>"}` : "<p>Review saved stages, sample dates, and open actions. Suggestions stay here until you choose to review and save them.</p>"}</div><div class="agent-footnote">${agentResult?.mode === "live" ? "AI can make mistakes. Review each suggestion." : "Demo analysis uses saved dates and stages; a live AI model is not connected in the preview."} Nothing is sent to suppliers.</div>`;
+  panel.innerHTML = `<div class="agent-head"><div class="row"><div><h2>✧ Branch AI</h2><span class="agent-mode">${agentResult?.mode === "live" ? "Live AI · Project tracking" : "Demo insights · Project tracking"}</span></div><button id="close-agent" aria-label="Close tracking assistant">×</button></div><p>Keep projects moving, one follow-up at a time.</p><small class="agent-scope">${agentScope === null ? "All projects" : esc(state.projects.find((p) => p.id === agentScope)?.name || "Project")} · Saved project data</small><textarea id="agent-question" aria-label="Ask the tracking assistant" placeholder="Summarize status and flag overdue actions…"></textarea><div class="agent-question"><button class="primary" id="analyze-project" ${agentBusy ? "disabled" : ""}>${agentBusy ? "Reviewing…" : "Review project status"}</button></div></div><div class="agent-content" id="agent-content">${agentBusy ? '<p role="status">Reviewing saved project status and supplier actions…</p>' : agentResult ? `<p>${esc(agentResult.summary)}</p>${agentEvidence()}<span class="eyebrow">${agentResult.mode === "live" ? "AI suggestions" : "Suggested follow-ups · demo analysis"}</span>${agentResult.suggested_followups.map((f, i) => `<div class="suggestion"><small>${esc(state.projects.find((p) => p.id === f.project_id)?.name || "Project")} · ${esc(state.suppliers.find((s) => s.id === f.supplier_id)?.name || "Supplier")}</small><p>${esc(f.message)}</p><button data-review-suggestion="${i}">Review follow-up →</button></div>`).join("") || "<p>No overdue follow-ups to suggest.</p>"}` : "<p>Review saved stages, sample dates, and open actions. Suggestions stay here until you choose to review and save them.</p>"}</div><div class="agent-footnote">${agentResult?.mode === "live" ? "AI can make mistakes. Review each suggestion." : "Demo analysis uses saved dates and stages; a live AI model is not connected in the preview."} Nothing is sent to suppliers.</div>`;
   $("#close-agent").onclick = () => {
     panel.hidden = true;
     $("#agent-toggle").focus();
@@ -2414,6 +2415,8 @@ function openAgent() {
   $("#agent-question").focus();
 }
 function bindDesign() {
+  if ($("#new-supplier")) $("#new-supplier").onclick = newSupplier;
+  if ($("#link-supplier")) $("#link-supplier").onclick = addSupplierToProject;
   if ($("#new-project")) $("#new-project").onclick = newProject;
   bindActionCenter();
   const navPage = [
@@ -2638,7 +2641,7 @@ function actionsPage() {
       ["week", "Within 7 days"],
     ],
     actionFilters.due,
-  )}</select></div><div><label for="action-query">Search actions</label><input id="action-query" name="query" type="search" maxlength="200" value="${esc(actionFilters.query)}" placeholder="Action, project, or person"></div><div class="filter-buttons"><button class="primary">Apply filters</button><button id="clear-action-filters" type="button">Clear</button></div></form><div class="card-heading"><h2>${rows.length} ${rows.length === 1 ? "action" : "actions"}</h2><small>Dates in Eastern time · Due today is not overdue</small></div><div class="table-wrap"><table class="action-table"><thead><tr><th>Next action / project</th><th>Supplier</th><th>Project owner</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr data-action-row="${a.project_id}:${a.supplier_id}"><td><button class="link" data-track="${a.project_id}:${a.supplier_id}">${esc(a.next_action)}</button><br><button class="quiet-link" data-project="${a.project_id}">${esc(a.project)}</button></td><td>${state.suppliers.find((s) => s.id === a.supplier_id).name}</td><td>${esc(a.owner)}</td><td><time datetime="${a.due_date}">${dateLabel(a.due_date)}</time></td><td><span class="pill ${a.completed ? "good" : a.due_date < today ? "warn" : "neutral"}">${actionStatus(a)}</span></td><td><button data-review-completion="${a.project_id}:${a.supplier_id}">${a.completed ? "Reopen action" : "Mark complete"}</button></td></tr>`).join("")}</tbody></table>${rows.length ? "" : '<div class="empty action-empty"><h2>No actions match these filters.</h2><p>Try another owner, due date, or status, or clear the filters.</p></div>'}</div></section><p class="dialog-info">Actions belong to their project owner. Completion does not change reservations or supplier capacity. Each supplier has one current follow-up per project; saved changes remain in project history.</p>`;
+  )}</select></div><div><label for="action-query">Search actions</label><input id="action-query" name="query" type="search" maxlength="200" value="${esc(actionFilters.query)}" placeholder="Action, project, or person"></div><div class="filter-buttons"><button class="primary">Apply filters</button><button id="clear-action-filters" type="button">Clear</button></div></form><div class="card-heading"><h2>${rows.length} ${rows.length === 1 ? "action" : "actions"}</h2><small>Dates in Eastern time · Due today is not overdue</small></div><div class="table-wrap"><table class="action-table"><thead><tr><th>Next action / project</th><th>Supplier</th><th>Project owner</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr data-action-row="${a.project_id}:${a.supplier_id}"><td><button class="link" data-track="${a.project_id}:${a.supplier_id}">${esc(a.next_action)}</button><br><button class="quiet-link" data-project="${a.project_id}">${esc(a.project)}</button></td><td>${esc(state.suppliers.find((s) => s.id === a.supplier_id).name)}</td><td>${esc(a.owner)}</td><td><time datetime="${a.due_date}">${dateLabel(a.due_date)}</time></td><td><span class="pill ${a.completed ? "good" : a.due_date < today ? "warn" : "neutral"}">${actionStatus(a)}</span></td><td><button data-review-completion="${a.project_id}:${a.supplier_id}">${a.completed ? "Reopen action" : "Mark complete"}</button></td></tr>`).join("")}</tbody></table>${rows.length ? "" : '<div class="empty action-empty"><h2>No actions match these filters.</h2><p>Try another owner, due date, or status, or clear the filters.</p></div>'}</div></section><p class="dialog-info">Actions belong to their project owner. Completion does not change reservations or supplier capacity. Each supplier has one current follow-up per project; saved changes remain in project history.</p>`;
 }
 function bindActionCenter() {
   document.querySelectorAll("[data-open-actions]").forEach(
@@ -2700,7 +2703,7 @@ function newProject() {
         : quarterStart;
   const sample = new Date(end + "T12:00:00Z");
   sample.setUTCDate(sample.getUTCDate() - 14);
-  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief. Add supplier candidates now or later; sample selection reserves capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner">${state.people.map((n) => `<option ${n === "Ryan Morris" ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div><label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2030-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2030-12-31" value="${end}"></div></div><label for="new-sample">Sample target</label><input id="new-sample" name="sample_due" type="date" required min="2026-01-01" max="2030-12-31" value="${sample.toISOString().slice(0, 10)}"><fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${s.name} <small>· ${s.specialty}</small></label>`).join("")}<small>These are candidates only. No sample reservations are created.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
+  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief. Add supplier candidates now or later; sample selection reserves capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner">${state.people.map((n) => `<option ${n === "Ryan Morris" ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div><label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2030-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2030-12-31" value="${end}"></div></div><label for="new-sample">Sample target</label><input id="new-sample" name="sample_due" type="date" required min="2026-01-01" max="2030-12-31" value="${sample.toISOString().slice(0, 10)}"><fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${esc(s.name)} <small>· ${esc(s.specialty)}</small></label>`).join("")}<small>These are candidates only. No sample reservations are created.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
   dialog.showModal();
   $("#cancel-new-project").onclick = () => dialog.close();
   $("#new-project-form").onsubmit = async (e) => {
@@ -2727,6 +2730,83 @@ function newProject() {
     }
   };
 }
+function newSupplier() {
+  const context = ["project", "comparison"].includes(page) ? selected() : null,
+    dialog = $("#planning-dialog"),
+    requestId = crypto.randomUUID();
+  dialog.innerHTML = `<form id="new-supplier-form"><h2 id="dialog-title">New supplier</h2><p>${context ? `Create a supplier and add it as a candidate for ${esc(context.name)}.` : "Add a partner to the shared supplier directory."} No capacity will be reserved.</p><label for="supplier-name">Supplier name</label><input id="supplier-name" name="name" required maxlength="120" placeholder="e.g. Cedarline Workshop"><label for="supplier-location">Location</label><input id="supplier-location" name="location" required maxlength="80" placeholder="e.g. Portugal"><label for="supplier-specialty">Capabilities</label><textarea id="supplier-specialty" name="specialty" required maxlength="160" placeholder="e.g. Adjustable desks, metalwork"></textarea><label for="supplier-lead">Estimated sample lead time (weeks)</label><input id="supplier-lead" name="lead" type="number" min="1" max="52" required step="1" value="6"><div class="callout">Quarterly capacity starts as Not assessed. A supplier is a candidate until you select a sample and reserve a slot.</div><p id="dialog-error" role="alert"></p><div class="actions"><button id="cancel-new-supplier" type="button">Cancel</button><button class="primary" id="save-new-supplier">Create supplier</button></div></form>`;
+  dialog.showModal();
+  $("#cancel-new-supplier").onclick = () => dialog.close();
+  $("#new-supplier-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target));
+    body.lead = Number(body.lead);
+    body.request_id = requestId;
+    if (context) {
+      body.project_id = context.id;
+      body.expected_version = context.version;
+    }
+    $("#save-new-supplier").disabled = true;
+    try {
+      const created = await api("/api/suppliers", body);
+      state = await api("/api/state");
+      dialog.close();
+      supplierId = created.id;
+      if (context) {
+        projectId = context.id;
+        projectTab = "suppliers";
+        go("project");
+      } else {
+        supplierTab = "Overview";
+        go("supplier");
+      }
+      showNotice(
+        context
+          ? "Supplier created and added as a candidate. No capacity reserved."
+          : "Supplier created. Add it to a project when ready.",
+      );
+    } catch (error) {
+      $("#dialog-error").textContent = error.message;
+      $("#save-new-supplier").disabled = false;
+    }
+  };
+}
+function addSupplierToProject() {
+  const supplier = supplierId,
+    available = state.projects.filter(
+      (p) => !projectSupplierIds(p).includes(supplier),
+    );
+  const dialog = $("#planning-dialog");
+  dialog.innerHTML = `<form id="link-supplier-form"><h2 id="dialog-title">Add supplier to project</h2><p>${esc(state.suppliers.find((s) => s.id === supplier).name)} will be added as a candidate. No capacity is reserved.</p><label for="link-project">Project</label><select id="link-project" name="project" required>${available.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select>${available.length ? "" : "<p>Already linked to every project. Create another project to add more work.</p>"}<p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-supplier-link">Cancel</button><button class="primary" id="save-supplier-link" ${available.length ? "" : "disabled"}>Add candidate</button></div></form>`;
+  dialog.showModal();
+  $("#cancel-supplier-link").onclick = () => dialog.close();
+  $("#link-supplier-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const p = available.find(
+      (p) => p.id === Number(e.target.elements.project.value),
+    );
+    $("#save-supplier-link").disabled = true;
+    try {
+      await api(
+        `/api/projects/${p.id}/shortlist`,
+        {
+          expected_version: p.version,
+          supplier_ids: [...new Set([...p.shortlist, supplier])],
+        },
+        "PUT",
+      );
+      state = await api("/api/state");
+      dialog.close();
+      projectId = p.id;
+      projectTab = "suppliers";
+      go("project");
+      showNotice("Supplier added as a candidate. No capacity reserved.");
+    } catch (error) {
+      $("#dialog-error").textContent = error.message;
+      $("#save-supplier-link").disabled = false;
+    }
+  };
+}
 
 // Used only by the explicitly labeled standalone preview, never the hosted app.
 const PREVIEW_STORAGE_KEY = "branch-fictional-preview-v1";
@@ -2746,6 +2826,7 @@ try {
 function hydratePreview() {
   previewData.history ||= [];
   previewData.creation_requests ||= {};
+  previewData.supplier_requests ||= {};
   previewData.supplier_stages ||= previewSeed.supplier_stages;
   for (const p of previewData.projects) {
     p.supplier_details ||= structuredClone(
@@ -2825,9 +2906,10 @@ api = async function previewApi(url, body, method = "POST") {
   hydratePreview();
   if (url === "/api/state") {
     previewCapacity();
-    const { creation_requests, ...view } = previewData;
+    const { creation_requests, supplier_requests, ...view } = previewData;
     return structuredClone(view);
   }
+  if (url === "/api/suppliers") return createPreviewSupplier(body);
   if (url === "/api/projects") {
     if (!/^[0-9a-f-]{36}$/i.test(body.request_id || ""))
       previewFailure(422, "Invalid creation request");
@@ -3037,10 +3119,7 @@ api = async function previewApi(url, body, method = "POST") {
       )
         previewFailure(422, "Choose distinct listed suppliers");
       p.shortlist = [...body.supplier_ids];
-      if (p.supplier_ids)
-        p.supplier_ids = [
-          ...new Set([...p.supplier_ids, ...body.supplier_ids]),
-        ];
+      attachPreviewCandidates(p, body.supplier_ids);
     } else {
       if (
         !body.name?.trim() ||
@@ -3118,11 +3197,8 @@ api = async function previewApi(url, body, method = "POST") {
         "This sample already has a reservation for this quarter",
       );
     const project = previewData.projects.find((p) => p.id === body.project_id);
-    if (
-      project.supplier_ids &&
-      !project.supplier_ids.includes(body.supplier_id)
-    ) {
-      project.supplier_ids.push(body.supplier_id);
+    if (!(project.supplier_ids || [1, 2, 3]).includes(body.supplier_id)) {
+      attachPreviewCandidates(project, [body.supplier_id]);
       project.version++;
     }
     previewData.reservations.push({
@@ -3173,6 +3249,94 @@ previewBanner.style.cssText =
 previewBanner.innerHTML =
   "<strong>Interactive preview · Fictional data only.</strong> Saved in this browser · No sign-in needed.";
 document.body.prepend(previewBanner);
+function attachPreviewCandidates(project, ids) {
+  project.supplier_ids = [
+    ...new Set([...(project.supplier_ids || [1, 2, 3]), ...ids]),
+  ];
+  for (const id of ids)
+    project.supplier_details[String(id)] ||= {
+      stage: "Discussions",
+      next_action: "",
+      due_date: project.sample_due,
+      completed: false,
+      updated_on: todayLocal(),
+    };
+}
+function createPreviewSupplier(body) {
+  if (!/^[0-9a-f-]{36}$/i.test(body.request_id || ""))
+    previewFailure(422, "Invalid creation request");
+  const fingerprint = JSON.stringify(
+    Object.fromEntries(
+      Object.entries(body).sort(([a], [b]) => a.localeCompare(b)),
+    ),
+  );
+  const previous = previewData.supplier_requests[body.request_id];
+  if (previous) {
+    if (previous.payload !== fingerprint)
+      previewFailure(
+        409,
+        "This creation request was already used. Reopen New supplier to start another.",
+      );
+    return { id: previous.supplier_id };
+  }
+  if (
+    !body.name?.trim() ||
+    body.name.trim().length > 120 ||
+    !body.location?.trim() ||
+    body.location.trim().length > 80 ||
+    !body.specialty?.trim() ||
+    body.specialty.trim().length > 160 ||
+    !Number.isInteger(body.lead) ||
+    body.lead < 1 ||
+    body.lead > 52
+  )
+    previewFailure(
+      422,
+      "Complete the supplier name, location, capabilities, and estimated lead time.",
+    );
+  if (
+    previewData.suppliers.some(
+      (s) =>
+        s.name.toLocaleLowerCase() === body.name.trim().toLocaleLowerCase(),
+    )
+  )
+    previewFailure(
+      409,
+      "A supplier with this name already exists. Choose the existing supplier instead.",
+    );
+  let project = null;
+  if (body.project_id !== undefined && body.project_id !== null) {
+    project = previewData.projects.find((p) => p.id === body.project_id);
+    if (!project) previewFailure(404, "Project not found");
+    if (project.version !== body.expected_version)
+      previewFailure(
+        409,
+        "This project changed. Cancel, refresh, and reopen New supplier before saving.",
+      );
+  }
+  const id = Math.max(0, ...previewData.suppliers.map((s) => s.id)) + 1;
+  previewData.suppliers.push({
+    id,
+    name: body.name.trim(),
+    location: body.location.trim(),
+    specialty: body.specialty.trim(),
+    lead: body.lead,
+    assessments: {},
+    background: {},
+  });
+  previewData.supplier_requests[body.request_id] = {
+    supplier_id: id,
+    payload: fingerprint,
+  };
+  if (project) {
+    attachPreviewCandidates(project, [id]);
+    project.shortlist = [...new Set([...project.shortlist, id])];
+    project.version++;
+    previewEvent(project.id, "Added supplier candidate: " + body.name.trim());
+  }
+  persistPreview();
+  return { id };
+}
 
     connectionControls(false);
     $("#app").innerHTML = '<p role="status">Loading your workspace…</p>';
