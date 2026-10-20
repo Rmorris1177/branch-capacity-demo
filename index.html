@@ -1612,8 +1612,9 @@ td {
           >Workspace <span style="color: #a1a69b"> / </span>
           <span id="crumb">Overview</span></span
         ><span
-          ><span class="avatar">RM</span>Ryan Morris &nbsp;
-          <button id="refresh">Refresh</button
+          ><label for="demo-person">View as (demo)</label>
+          <select id="demo-person" aria-label="View as (demo)"></select>
+          &nbsp; <button id="refresh">Refresh</button
           ><button id="agent-toggle">✧ Branch AI</button></span
         >
       </header>
@@ -1653,7 +1654,10 @@ td {
           body
             ? {
                 method,
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Branch-Demo-Actor": currentDemoActor(),
+                },
                 body: JSON.stringify(body),
               }
             : { headers: { Accept: "application/json" } },
@@ -1813,7 +1817,7 @@ td {
       if (page === "preview" || page === "selection") {
         let s = supplier(),
           exists = reservations(s).some((r) => r.project_id === projectId);
-        html = `<button class="back" data-go="${page === "preview" ? "comparison" : "preview"}">← ${page === "preview" ? "Supplier comparison" : "Capacity preview"}</button><div class="eyebrow">${esc(selected().name)} / ${esc(s.name)}</div><h1>${page === "preview" ? "See the impact before you commit." : "Choose a sample. Hold a place."}</h1>${steps()}<section class="card wide"><div class="row"><h2>${esc(s.name)}</h2><select id="quarter" aria-label="Reservation quarter">${state.quarters.map((q) => `<option ${q === quarter ? "selected" : ""}>${q}</option>`).join("")}</select></div><p>${esc(s.specialty)} · ${esc(s.location)}</p><div class="split"><div class="metric"><small>Current workload</small><strong>${load(s)} projects</strong></div><div class="metric"><small>After sample selection</small><strong>${load(s) + (exists ? 0 : 1)} projects ${badge(s, exists ? 0 : 1)}</strong></div></div>${bar(s, exists ? 0 : 1)}<div class="callout">${limit(s) === null ? "Capacity is not assessed. Confirm availability with the supplier." : load(s) + (exists ? 0 : 1) > limit(s) ? "This reservation exceeds the assessed limit. Discuss timing with the supplier; this is a planning warning and does not block a reservation." : "There is room within the illustrative assessed development limit."}</div><p>Each project counts once per supplier per quarter. These fictional counts measure development projects, not production units or peak effort. Background workload is illustrative.</p>${page === "selection" ? `<div class="metric"><strong>Prototype sample · ${esc(selected().name)}</strong><small>One development slot · ${quarter} · Selected by Ryan Morris</small></div><p><label><input type="checkbox" id="ack"> I have reviewed the capacity impact and want to reserve this sample.</label></p><button id="reserve" class="primary" ${exists ? "disabled" : ""}>${exists ? "Already reserved" : "Select sample & reserve capacity →"}</button>` : `<button class="primary" data-go="selection">Continue to sample selection →</button>`}<p id="error" role="alert"></p></section>`;
+        html = `<button class="back" data-go="${page === "preview" ? "comparison" : "preview"}">← ${page === "preview" ? "Supplier comparison" : "Capacity preview"}</button><div class="eyebrow">${esc(selected().name)} / ${esc(s.name)}</div><h1>${page === "preview" ? "See the impact before you commit." : "Choose a sample. Hold a place."}</h1>${steps()}<section class="card wide"><div class="row"><h2>${esc(s.name)}</h2><select id="quarter" aria-label="Reservation quarter">${state.quarters.map((q) => `<option ${q === quarter ? "selected" : ""}>${q}</option>`).join("")}</select></div><p>${esc(s.specialty)} · ${esc(s.location)}</p><div class="split"><div class="metric"><small>Current workload</small><strong>${load(s)} projects</strong></div><div class="metric"><small>After sample selection</small><strong>${load(s) + (exists ? 0 : 1)} projects ${badge(s, exists ? 0 : 1)}</strong></div></div>${bar(s, exists ? 0 : 1)}<div class="callout">${limit(s) === null ? "Capacity is not assessed. Confirm availability with the supplier." : load(s) + (exists ? 0 : 1) > limit(s) ? "This reservation exceeds the assessed limit. Discuss timing with the supplier; this is a planning warning and does not block a reservation." : "There is room within the illustrative assessed development limit."}</div><p>Each project counts once per supplier per quarter. These fictional counts measure development projects, not production units or peak effort. Background workload is illustrative.</p>${page === "selection" ? `<div class="metric"><strong>Prototype sample · ${esc(selected().name)}</strong><small>One development slot · ${quarter} · Selected by ${esc(currentDemoActor())}</small></div><p><label><input type="checkbox" id="ack"> I have reviewed the capacity impact and want to reserve this sample.</label></p><button id="reserve" class="primary" ${exists ? "disabled" : ""}>${exists ? "Already reserved" : "Select sample & reserve capacity →"}</button>` : `<button class="primary" data-go="selection">Continue to sample selection →</button>`}<p id="error" role="alert"></p></section>`;
       }
       if (page === "confirmed") {
         html = `<section class="card wide"><div class="check">✓</div><div class="eyebrow">Sample selected</div><h1>A place in the plan.</h1><p>${esc(selected().name)} now has a sample reservation with ${esc(supplier().name)} for ${quarter}.</p><p>The reservation has been saved to the separate browser demo database.</p><button class="primary" data-go="workload">View supplier workload →</button> <button data-go="comparison">Compare another supplier</button></section>`;
@@ -2106,12 +2110,33 @@ function dateLabel(date) {
     timeZone: "UTC",
   }).format(new Date(date + "T12:00:00Z"));
 }
-function projectActions(p) {
-  return Object.entries(p.supplier_details || {})
-    .filter(([, d]) => d.next_action && !d.completed)
-    .map(([sid, d]) => ({ ...d, supplier_id: +sid, project_id: p.id }))
+function projectActions(p, includeCompleted = false) {
+  return [
+    ...Object.entries(p.supplier_details || {})
+      .filter(([, d]) => d.next_action)
+      .map(([sid, d]) => ({ ...d, supplier_id: +sid, project_id: p.id })),
+    ...(p.actions || []).map((a) => ({
+      ...a,
+      next_action: a.title,
+      action_id: a.id,
+      project_id: p.id,
+    })),
+  ]
+    .filter((a) => includeCompleted || !a.completed)
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 }
+function actionSupplierName(a) {
+  return (
+    state.suppliers.find((s) => s.id === a.supplier_id)?.name ||
+    "Project action"
+  );
+}
+function actionTrigger(a) {
+  return a.action_id
+    ? `data-edit-action="${a.project_id}:${a.action_id}"`
+    : `data-track="${a.project_id}:${a.supplier_id}"`;
+}
+
 function allActions() {
   return state.projects
     .flatMap(projectActions)
@@ -2127,7 +2152,7 @@ function nextActions(p, limit = 3) {
       .slice(0, limit)
       .map(
         (a) =>
-          `<div class="next-action"><button class="action-marker ${a.due_date < todayLocal() ? "overdue" : ""}" data-track="${a.project_id}:${a.supplier_id}" aria-label="Update ${esc(a.next_action)}">${a.due_date < todayLocal() ? "!" : ""}</button><div><strong>${esc(a.next_action)}</strong><small>${esc(state.suppliers.find((s) => s.id === a.supplier_id).name)}${!p ? " · " + esc(state.projects.find((p) => p.id === a.project_id).name) : ""}</small></div><time datetime="${a.due_date}">${dateLabel(a.due_date)}</time></div>`,
+          `<div class="next-action"><button class="action-marker ${a.due_date < todayLocal() ? "overdue" : ""}" ${actionTrigger(a)} aria-label="Update ${esc(a.next_action)}">${a.due_date < todayLocal() ? "!" : ""}</button><div><strong>${esc(a.next_action)}</strong><small>${esc(actionSupplierName(a))}${!p ? " · " + esc(state.projects.find((p) => p.id === a.project_id).name) : ""}</small></div><time datetime="${a.due_date}">${dateLabel(a.due_date)}</time></div>`,
       )
       .join("") || '<p class="empty">All supplier actions are up to date.</p>'
   );
@@ -2136,7 +2161,7 @@ function agentCard(p) {
   const overdue = (p ? projectActions(p) : allActions()).filter(
     (a) => a.due_date < todayLocal(),
   );
-  return `<section class="card agent-card section"><div class="agent-layout"><span class="agent-symbol">✧</span><div><h2>Branch AI</h2><span class="agent-mode">Project tracking assistant</span></div></div><p>${overdue.length ? `${overdue.length} supplier actions need a follow-up. Review what’s overdue and plan the next step.` : "Keep the next milestone in sight. Review project status and upcoming follow-ups."}</p><button class="primary" data-agent>Review with assistant →</button></section>`;
+  return `<section class="card agent-card section"><div class="agent-layout"><span class="agent-symbol">✧</span><div><h2>Branch AI</h2><span class="agent-mode">Project tracking assistant</span></div></div><p>${overdue.length ? `${overdue.length} actions need a follow-up. Review what’s overdue and plan the next step.` : "Keep the next milestone in sight. Review project status and upcoming follow-ups."}</p><button class="primary" data-agent>Review with assistant →</button></section>`;
 }
 function projectRows(projects) {
   return projects
@@ -2214,6 +2239,7 @@ function designPage() {
     let content = "";
     if (projectTab === "suppliers")
       content = supplierTable(p) + reservationList(p);
+    if (projectTab === "actions") content = projectActionList(p);
     if (projectTab === "overview")
       content =
         `<section class="card"><h2>Project brief</h2><p style="white-space:pre-wrap">${esc(p.description)}</p><div class="split"><div class="metric"><small>Owner</small><strong>${esc(p.owner)}</strong></div><div class="metric"><small>Sample target</small><strong>${dateLabel(p.sample_due)}</strong></div></div><div class="callout">Supplier shortlists keep options open. Sample selection reserves one development slot per supplier and quarter.</div><button class="primary" data-go="comparison">Compare suppliers →</button></section>` +
@@ -2242,44 +2268,52 @@ function designPage() {
           .join("") ||
         "<p>No changes recorded yet. Saved project and supplier updates appear here.</p>"
       }</section>`;
-    return `<div class="project-hero">${art(p, true)}<div class="project-heading"><div class="hero-status"><span class="eyebrow">DEMO · Initial concept</span>${projectStage(p)}</div><h1>${esc(p.name)}</h1><div class="project-metadata"><div><small>Owner</small><strong>${esc(p.owner)}</strong></div><div><small>Product area</small><strong>${esc(p.category)}</strong></div><div><small>Target launch</small><strong>${esc(p.target_launch || "2027")}</strong></div></div><p>${esc(p.description)}</p><button id="edit-project" style="margin-top:15px;font-size:11px">Edit brief</button></div></div><div class="project-tabs" role="tablist" aria-label="Project sections">${["overview", "suppliers", "schedule", "history"].map((t) => `<button role="tab" data-tab="${t}" class="${projectTab === t ? "active" : ""}" aria-selected="${projectTab === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div><div class="project-content"><div>${content}</div><div><section class="card"><div class="row"><h2>Next actions (${projectActions(p).length})</h2><button class="quiet-link" data-open-actions="${p.id}">View all</button></div>${nextActions(p)}</section>${agentCard(p)}</div></div>`;
+    return `<div class="project-hero">${art(p, true)}<div class="project-heading"><div class="hero-status"><span class="eyebrow">DEMO · Initial concept</span>${projectStage(p)}</div><h1>${esc(p.name)}</h1><div class="project-metadata"><div><small>Owner</small><strong>${esc(p.owner)}</strong></div><div><small>Product area</small><strong>${esc(p.category)}</strong></div><div><small>Target launch</small><strong>${esc(p.target_launch || "2027")}</strong></div></div><p>${esc(p.description)}</p><button id="edit-project" style="margin-top:15px;font-size:11px">Edit brief</button></div></div><div class="project-tabs" role="tablist" aria-label="Project sections">${["overview", "suppliers", "actions", "schedule", "history"].map((t) => `<button role="tab" data-tab="${t}" class="${projectTab === t ? "active" : ""}" aria-selected="${projectTab === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div><div class="project-content"><div>${content}</div><div><section class="card"><div class="row"><h2>Next actions (${projectActions(p).length})</h2><button data-new-action="${p.id}">＋ New action</button><button class="quiet-link" data-open-actions="${p.id}">View all</button></div>${nextActions(p)}</section>${agentCard(p)}</div></div>`;
   }
   if (page === "suppliers")
     return `<div class="row"><h1>Supplier partners</h1><div class="page-heading-actions"><span class="pill">${state.suppliers.length} development partners</span><button class="primary" id="new-supplier">＋ New supplier</button></div></div><p class="page-subtitle">A shared view of relationships, development work, and next steps.</p><div class="compare">${state.suppliers.map((s) => `<section class="card"><span class="eyebrow">${esc(s.location)}</span><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p>${badge(s)}<div class="metric"><small>Development pipeline</small><strong>${supplierProjects(s).length} projects</strong></div><button class="primary" data-profile="${s.id}">View supplier →</button></section>`).join("")}</div>`;
   if (page === "supplier") {
     const s = supplier(),
       rs = reservations(s);
-    return `<div class="row"><div><span class="eyebrow">Suppliers / ${esc(s.name)}</span><h1>${esc(s.name)}</h1></div><div class="page-heading-actions"><span class="pill good"><span class="dot"></span>Development partner</span><button id="edit-supplier-capacity" class="primary">Edit capacity & capabilities</button><button id="link-supplier">Add to project</button></div></div><div class="project-tabs">${["Overview", "Projects", "Communications", "Files"].map((t) => `<button data-supplier-tab="${t}" class="${supplierTab === t ? "active" : ""}">${t}</button>`).join("")}</div>${
+    return `<div class="row"><div><span class="eyebrow">Suppliers / ${esc(s.name)}</span><h1>${esc(s.name)}</h1></div><div class="page-heading-actions"><span class="pill good"><span class="dot"></span>Development partner</span><button id="edit-supplier-capacity" class="primary">Edit capacity & capabilities</button><button id="link-supplier">Add to project</button></div></div><div class="project-tabs">${["Overview", "Projects", "Actions", "Communications", "Files"].map((t) => `<button data-supplier-tab="${t}" class="${supplierTab === t ? "active" : ""}">${t}</button>`).join("")}</div>${
       supplierTab === "Communications" || supplierTab === "Files"
         ? `<section class="card"><h2>${supplierTab}</h2><p>${supplierTab === "Files" ? "No files attached in this fictional demo." : "No messages have been sent. The tracking assistant prepares internal follow-up suggestions for review."}</p></section>`
-        : `${supplierAssessmentCard(s)}${sourcingPipeline()}<div class="supplier-profile"><section class="card"><div class="row"><h2>Sourcing pipeline</h2><span class="quiet-link">${supplierProjects(s).length} projects</span></div>${supplierProjects(
-            s,
-          )
-            .map(
-              (p) =>
-                `<div class="pipeline-row">${art(p)}<div><button class="link" data-project="${p.id}">${esc(p.name)}</button><small>${stagePill(p.supplier_details[String(s.id)].stage)}</small><small>Target launch ${esc(p.target_launch || "2027")}</small></div><button class="link" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>`,
+        : supplierTab === "Actions"
+          ? supplierActionList(s)
+          : `${supplierAssessmentCard(s)}${supplierActionList(s)}${sourcingPipeline()}<div class="supplier-profile"><section class="card"><div class="row"><h2>Sourcing pipeline</h2><span class="quiet-link">${supplierProjects(s).length} projects</span></div>${supplierProjects(
+              s,
             )
-            .join(
-              "",
-            )}</section><div><section class="card"><h2>Reserved development</h2>${
-            rs
-              .map((r) => {
-                const p = state.projects.find((p) => p.id === r.project_id);
-                return `<div class="pipeline-row">${art(p)}<div><button class="link" data-project="${p.id}">${esc(p.name)}</button><small>${r.quarter} · Sample development</small>${cancelButton(r)}</div></div>`;
-              })
-              .join("") || "<p>No sample reservations this quarter.</p>"
-          }</section><section class="card section"><div class="row"><h2>Quarterly capacity</h2><button class="quiet-link" data-go="workload">View details</button></div><table><tbody>${state.capacity
-            .filter((c) => c.supplier_id === s.id)
-            .map(
-              (c) =>
-                `<tr><td>${c.quarter}</td><td>${c.scheduled} projects</td><td><span class="pill ${c.status === "Over limit" ? "warn" : "good"}">${c.status}</span></td></tr>`,
-            )
-            .join("")}</tbody></table></section>${agentCard(null)}</div></div>`
+              .map(
+                (p) =>
+                  `<div class="pipeline-row">${art(p)}<div><button class="link" data-project="${p.id}">${esc(p.name)}</button><small>${stagePill(p.supplier_details[String(s.id)].stage)}</small><small>Target launch ${esc(p.target_launch || "2027")}</small></div><button class="link" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>`,
+              )
+              .join(
+                "",
+              )}</section><div><section class="card"><h2>Reserved development</h2>${
+              rs
+                .map((r) => {
+                  const p = state.projects.find((p) => p.id === r.project_id);
+                  return `<div class="pipeline-row">${art(p)}<div><button class="link" data-project="${p.id}">${esc(p.name)}</button><small>${r.quarter} · Sample development</small>${cancelButton(r)}</div></div>`;
+                })
+                .join("") || "<p>No sample reservations this quarter.</p>"
+            }</section><section class="card section"><div class="row"><h2>Quarterly capacity</h2><button class="quiet-link" data-go="workload">View details</button></div><table><tbody>${state.capacity
+              .filter((c) => c.supplier_id === s.id)
+              .map(
+                (c) =>
+                  `<tr><td>${c.quarter}</td><td>${c.scheduled} projects</td><td><span class="pill ${c.status === "Over limit" ? "warn" : "good"}">${c.status}</span></td></tr>`,
+              )
+              .join(
+                "",
+              )}</tbody></table></section>${agentCard(null)}</div></div>`
     }`;
   }
   return null;
 }
 function openTracking(project, sid, suggestion, completedOverride) {
+  if (!canEditProject(project)) {
+    showNotice("Only " + project.owner + " can update this project.");
+    return;
+  }
   const d = project.supplier_details[String(sid)],
     dialog = $("#planning-dialog");
   dialog.innerHTML = `<form id="tracking-form"><h2 id="dialog-title">Update supplier follow-up</h2><p>${esc(project.name)} · ${esc(state.suppliers.find((s) => s.id === sid).name)}</p>${suggestion ? '<div class="callout">Assistant suggestion · Review and edit before saving. No message will be sent.</div>' : ""}<label for="tracking-stage">Supplier stage</label><select id="tracking-stage" name="stage">${state.supplier_stages.map((stage) => `<option ${stage === d.stage ? "selected" : ""}>${stage}</option>`).join("")}</select><label for="tracking-action">Next action</label><textarea id="tracking-action" name="next_action" required maxlength="500">${esc(suggestion || d.next_action)}</textarea><label for="tracking-due">Due date</label><input id="tracking-due" type="date" name="due_date" required min="2026-01-01" max="2030-12-31" value="${d.due_date}"><label><input type="checkbox" name="completed" ${(completedOverride ?? d.completed) ? "checked" : ""}> Mark action completed</label><p id="dialog-error" role="alert"></p><button type="button" id="reload-tracking" hidden>Load latest follow-up (discard edits)</button><div class="actions"><button id="cancel-tracking" type="button">Cancel</button><button class="primary" id="save-tracking">Save follow-up</button></div></form>`;
@@ -2415,6 +2449,8 @@ function openAgent() {
   $("#agent-question").focus();
 }
 function bindDesign() {
+  bindProjectActions();
+  applyOwnerPermissions();
   document.querySelectorAll("[data-source-project]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -2546,24 +2582,20 @@ function actionFilterQuery() {
 function trackedActions() {
   return state.projects
     .flatMap((p) =>
-      Object.entries(p.supplier_details || {})
-        .filter(([, d]) => d.next_action)
-        .map(([sid, d]) => ({
-          ...d,
-          project_id: p.id,
-          supplier_id: +sid,
-          project: p.name,
-          owner: p.owner,
-        })),
+      projectActions(p, true).map((a) => ({
+        ...a,
+        project: p.name,
+        owner: p.owner,
+      })),
     )
     .sort(
       (a, b) =>
         Number(a.completed) - Number(b.completed) ||
         a.due_date.localeCompare(b.due_date) ||
-        a.project_id - b.project_id ||
-        a.supplier_id - b.supplier_id,
+        a.project_id - b.project_id,
     );
 }
+
 function actionStatus(a) {
   return a.completed
     ? "Completed"
@@ -2595,12 +2627,7 @@ function actionsPage() {
           a.due_date >= today &&
           a.due_date <= week)) &&
       (!actionFilters.query ||
-        [
-          a.next_action,
-          a.project,
-          a.owner,
-          state.suppliers.find((s) => s.id === a.supplier_id).name,
-        ].some((v) =>
+        [a.next_action, a.project, a.owner, actionSupplierName(a)].some((v) =>
           v.toLowerCase().includes(actionFilters.query.toLowerCase()),
         )),
   );
@@ -2611,7 +2638,7 @@ function actionsPage() {
           `<option value="${esc(id)}" ${value === String(id) ? "selected" : ""}>${esc(label)}</option>`,
       )
       .join("");
-  return `<div class="row"><div><div class="eyebrow">Shared project tracking</div><h1>Action center</h1><p class="page-subtitle">The next step, the right person, and a clear date.</p></div><button data-agent>✧ Review with Branch AI</button></div><div class="stats actions-stats">${[
+  return `<div class="row"><div><div class="eyebrow">Shared project tracking</div><h1>Action center</h1><p class="page-subtitle">The next step, the right person, and a clear date.</p></div><div class="page-heading-actions"><button id="new-project-action" class="primary">＋ New action</button><button data-agent>✧ Review with Branch AI</button></div></div><div class="stats actions-stats">${[
     ["Open actions", all.filter((a) => !a.completed).length],
     ["Overdue", all.filter((a) => !a.completed && a.due_date < today).length],
     [
@@ -2650,7 +2677,7 @@ function actionsPage() {
       ["week", "Within 7 days"],
     ],
     actionFilters.due,
-  )}</select></div><div><label for="action-query">Search actions</label><input id="action-query" name="query" type="search" maxlength="200" value="${esc(actionFilters.query)}" placeholder="Action, project, or person"></div><div class="filter-buttons"><button class="primary">Apply filters</button><button id="clear-action-filters" type="button">Clear</button></div></form><div class="card-heading"><h2>${rows.length} ${rows.length === 1 ? "action" : "actions"}</h2><small>Dates in Eastern time · Due today is not overdue</small></div><div class="table-wrap"><table class="action-table"><thead><tr><th>Next action / project</th><th>Supplier</th><th>Project owner</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr data-action-row="${a.project_id}:${a.supplier_id}"><td><button class="link" data-track="${a.project_id}:${a.supplier_id}">${esc(a.next_action)}</button><br><button class="quiet-link" data-project="${a.project_id}">${esc(a.project)}</button></td><td>${esc(state.suppliers.find((s) => s.id === a.supplier_id).name)}</td><td>${esc(a.owner)}</td><td><time datetime="${a.due_date}">${dateLabel(a.due_date)}</time></td><td><span class="pill ${a.completed ? "good" : a.due_date < today ? "warn" : "neutral"}">${actionStatus(a)}</span></td><td><button data-review-completion="${a.project_id}:${a.supplier_id}">${a.completed ? "Reopen action" : "Mark complete"}</button></td></tr>`).join("")}</tbody></table>${rows.length ? "" : '<div class="empty action-empty"><h2>No actions match these filters.</h2><p>Try another owner, due date, or status, or clear the filters.</p></div>'}</div></section><p class="dialog-info">Actions belong to their project owner. Completion does not change reservations or supplier capacity. Each supplier has one current follow-up per project; saved changes remain in project history.</p>`;
+  )}</select></div><div><label for="action-query">Search actions</label><input id="action-query" name="query" type="search" maxlength="200" value="${esc(actionFilters.query)}" placeholder="Action, project, or person"></div><div class="filter-buttons"><button class="primary">Apply filters</button><button id="clear-action-filters" type="button">Clear</button></div></form><div class="card-heading"><h2>${rows.length} ${rows.length === 1 ? "action" : "actions"}</h2><small>Dates in Eastern time · Due today is not overdue</small></div><div class="table-wrap"><table class="action-table"><thead><tr><th>Next action / project</th><th>Supplier</th><th>Project owner</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr data-action-row="${a.project_id}:${a.action_id || a.supplier_id}"><td><button class="link" ${actionTrigger(a)}>${esc(a.next_action)}</button><br><button class="quiet-link" data-project="${a.project_id}">${esc(a.project)}</button></td><td>${esc(actionSupplierName(a))}</td><td>${esc(a.owner)}</td><td><time datetime="${a.due_date}">${dateLabel(a.due_date)}</time></td><td><span class="pill ${a.completed ? "good" : a.due_date < today ? "warn" : "neutral"}">${actionStatus(a)}</span></td><td>${a.action_id ? `<button data-complete-action="${a.project_id}:${a.action_id}">${a.completed ? "Reopen action" : "Mark complete"}</button>` : `<button data-review-completion="${a.project_id}:${a.supplier_id}">${a.completed ? "Reopen action" : "Mark complete"}</button>`}</td></tr>`).join("")}</tbody></table>${rows.length ? "" : '<div class="empty action-empty"><h2>No actions match these filters.</h2><p>Try another owner, due date, or status, or clear the filters.</p></div>'}</div></section><p class="dialog-info">Actions belong to their project owner. Completion does not change reservations or supplier capacity. Add multiple project actions, with an optional linked supplier. Actions are assigned to the project owner. Only that owner can edit or complete them; everyone can view. Saved changes remain in project history.</p>`;
 }
 function bindActionCenter() {
   document.querySelectorAll("[data-open-actions]").forEach(
@@ -2712,7 +2739,7 @@ function newProject() {
         : quarterStart;
   const sample = new Date(end + "T12:00:00Z");
   sample.setUTCDate(sample.getUTCDate() - 14);
-  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief. Add supplier candidates now or later; sample selection reserves capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner">${state.people.map((n) => `<option ${n === "Ryan Morris" ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div><label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2030-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2030-12-31" value="${end}"></div></div><label for="new-sample">Sample target</label><input id="new-sample" name="sample_due" type="date" required min="2026-01-01" max="2030-12-31" value="${sample.toISOString().slice(0, 10)}"><fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${esc(s.name)} <small>· ${esc(s.specialty)}</small></label>`).join("")}<small>These are candidates only. No sample reservations are created.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
+  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief. Add supplier candidates now or later; sample selection reserves capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner"><option>${esc(currentDemoActor())}</option></select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div><label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2030-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2030-12-31" value="${end}"></div></div><label for="new-sample">Sample target</label><input id="new-sample" name="sample_due" type="date" required min="2026-01-01" max="2030-12-31" value="${sample.toISOString().slice(0, 10)}"><fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${esc(s.name)} <small>· ${esc(s.specialty)}</small></label>`).join("")}<small>These are candidates only. No sample reservations are created.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
   dialog.showModal();
   $("#cancel-new-project").onclick = () => dialog.close();
   $("#new-project-form").onsubmit = async (e) => {
@@ -2783,10 +2810,10 @@ function newSupplier() {
 function addSupplierToProject() {
   const supplier = supplierId,
     available = state.projects.filter(
-      (p) => !projectSupplierIds(p).includes(supplier),
+      (p) => canEditProject(p) && !projectSupplierIds(p).includes(supplier),
     );
   const dialog = $("#planning-dialog");
-  dialog.innerHTML = `<form id="link-supplier-form"><h2 id="dialog-title">Add supplier to project</h2><p>${esc(state.suppliers.find((s) => s.id === supplier).name)} will be added as a candidate. No capacity is reserved.</p><label for="link-project">Project</label><select id="link-project" name="project" required>${available.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select>${available.length ? "" : "<p>Already linked to every project. Create another project to add more work.</p>"}<p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-supplier-link">Cancel</button><button class="primary" id="save-supplier-link" ${available.length ? "" : "disabled"}>Add candidate</button></div></form>`;
+  dialog.innerHTML = `<form id="link-supplier-form"><h2 id="dialog-title">Add supplier to project</h2><p>${esc(state.suppliers.find((s) => s.id === supplier).name)} will be added as a candidate. No capacity is reserved.</p><label for="link-project">Project</label><select id="link-project" name="project" required>${available.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select>${available.length ? "" : "<p>No unlinked projects owned by the current demo person. Switch to the project owner or create a project.</p>"}<p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-supplier-link">Cancel</button><button class="primary" id="save-supplier-link" ${available.length ? "" : "disabled"}>Add candidate</button></div></form>`;
   dialog.showModal();
   $("#cancel-supplier-link").onclick = () => dialog.close();
   $("#link-supplier-form").onsubmit = async (e) => {
@@ -2862,6 +2889,218 @@ function sourcingPipeline() {
     (p) => projectSupplierIds(p).length === 0 && p.status !== "Complete",
   );
   return `<section class="card section"><div class="row"><h2>Sourcing pipeline · Suppliers needed</h2><span class="pill">${projects.length} projects</span></div><p>Fictional concepts ready for supplier comparison. Shortlisting a candidate does not reserve capacity.</p>${projects.map((p) => `<div class="pipeline-row">${art(p)}<div><button class="link" data-project="${p.id}">${esc(p.name)}</button><small>${esc(p.category)} · ${esc(p.owner)}</small><small>Sample target ${dateLabel(p.sample_due)}</small></div><button class="primary" data-source-project="${p.id}">Select suppliers</button></div>`).join("") || "<p>All active projects have supplier candidates.</p>"}</section>`;
+}
+
+function currentDemoActor() {
+  try {
+    const name = localStorage.getItem("branch-demo-person");
+    return (state?.people || ["Ryan Morris"]).includes(name)
+      ? name
+      : "Ryan Morris";
+  } catch {
+    return "Ryan Morris";
+  }
+}
+function canEditProject(p) {
+  return p?.owner === currentDemoActor();
+}
+function applyOwnerPermissions() {
+  const picker = $("#demo-person");
+  if (picker) {
+    picker.innerHTML = state.people
+      .map(
+        (n) =>
+          `<option ${n === currentDemoActor() ? "selected" : ""}>${esc(n)}</option>`,
+      )
+      .join("");
+    picker.onchange = () => {
+      try {
+        localStorage.setItem("branch-demo-person", picker.value);
+      } catch {
+        showNotice("Browser storage is required to switch demo people.");
+        return;
+      }
+      $("#planning-dialog").close();
+      agentResult = null;
+      agentRequestId++;
+      render();
+      if ($("#tracking-agent") && !$("#tracking-agent").hidden) drawAgent();
+    };
+  }
+  const disable = (button, p) => {
+    if (button && p && !canEditProject(p)) {
+      button.disabled = true;
+      button.title = "Only " + p.owner + " can update this project";
+    }
+  };
+  if (["project", "comparison", "preview", "selection"].includes(page)) {
+    const p = selected();
+    for (const selector of [
+      "#edit-project",
+      "#new-supplier",
+      "#reserve",
+      "#ack",
+      "[data-shortlist]",
+      "[data-new-action]",
+    ])
+      document.querySelectorAll(selector).forEach((b) => disable(b, p));
+    if (!canEditProject(p)) {
+      const note = document.createElement("p");
+      note.className = "callout";
+      note.id = "owner-readonly";
+      note.textContent =
+        "Read-only · " +
+        p.owner +
+        " owns this project. Everyone can view; only the owner can save changes.";
+      $("#app").prepend(note);
+    }
+  }
+  document
+    .querySelectorAll(
+      "[data-track],[data-review-completion],[data-edit-action],[data-complete-action]",
+    )
+    .forEach((b) => {
+      const key =
+        b.dataset.track ||
+        b.dataset.reviewCompletion ||
+        b.dataset.editAction ||
+        b.dataset.completeAction;
+      disable(
+        b,
+        state.projects.find((p) => p.id === Number(key.split(":")[0])),
+      );
+    });
+  document.querySelectorAll("[data-cancel]").forEach((b) => {
+    const r = state.reservations.find((r) => r.token === b.dataset.cancel);
+    disable(
+      b,
+      state.projects.find((p) => p.id === r?.project_id),
+    );
+  });
+}
+function bindProjectActions() {
+  document
+    .querySelectorAll("[data-new-supplier-action]")
+    .forEach(
+      (b) =>
+        (b.onclick = () =>
+          chooseActionProject(Number(b.dataset.newSupplierAction))),
+    );
+  if ($("#new-project-action"))
+    $("#new-project-action").onclick = () => chooseActionProject();
+  document
+    .querySelectorAll("[data-new-action]")
+    .forEach(
+      (b) =>
+        (b.onclick = () =>
+          editProjectAction(
+            state.projects.find((p) => p.id === Number(b.dataset.newAction)),
+          )),
+    );
+  document
+    .querySelectorAll("[data-edit-action],[data-complete-action]")
+    .forEach(
+      (b) =>
+        (b.onclick = () => {
+          const [pid, id] = (
+            b.dataset.editAction || b.dataset.completeAction
+          ).split(":");
+          const p = state.projects.find((p) => p.id === Number(pid)),
+            a = p.actions.find((a) => a.id === id);
+          editProjectAction(
+            p,
+            a,
+            b.dataset.completeAction ? !a.completed : undefined,
+          );
+        }),
+    );
+}
+function chooseActionProject(relatedSupplier = null) {
+  const projects = state.projects.filter(
+      (p) =>
+        canEditProject(p) &&
+        (relatedSupplier === null ||
+          projectSupplierIds(p).includes(relatedSupplier)),
+    ),
+    dialog = $("#planning-dialog");
+  dialog.innerHTML = `<form id="choose-action-project"><h2 id="dialog-title">New action</h2><p>Actions are assigned to the project owner. You are viewing as ${esc(currentDemoActor())}.</p>${projects.length ? `<label for="new-action-project">Project</label><select id="new-action-project">${projects.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select>` : "<p>No eligible projects owned by the current demo person. Create a project or switch to an owner. From a supplier, first link that supplier to the project.</p>"}<div class="actions"><button type="button" id="cancel-action-project">Cancel</button>${projects.length ? '<button class="primary">Continue</button>' : ""}</div></form>`;
+  dialog.showModal();
+  $("#cancel-action-project").onclick = () => dialog.close();
+  $("#choose-action-project").onsubmit = (e) => {
+    e.preventDefault();
+    const p = projects.find(
+      (p) => p.id === Number($("#new-action-project").value),
+    );
+    editProjectAction(p, undefined, undefined, relatedSupplier);
+  };
+}
+function editProjectAction(p, action, completion, relatedSupplier = null) {
+  if (!canEditProject(p)) {
+    showNotice("Only " + p.owner + " can update this project.");
+    return;
+  }
+  const dialog = $("#planning-dialog"),
+    requestId = crypto.randomUUID();
+  dialog.innerHTML = `<form id="project-action-form"><h2 id="dialog-title">${action ? "Update action" : "New action"}</h2><p>${esc(p.name)} · Assigned to ${esc(p.owner)}</p><label for="project-action-title">Action description</label><textarea id="project-action-title" name="title" required maxlength="500">${esc(action?.title || "")}</textarea><label for="project-action-date">Due date</label><input id="project-action-date" name="due_date" type="date" required min="2026-01-01" max="2030-12-31" value="${esc(action?.due_date || p.sample_due)}"><label for="project-action-supplier">Supplier (optional)</label><select id="project-action-supplier" name="supplier_id"><option value="">Project action · no supplier</option>${state.suppliers
+    .filter((s) => projectSupplierIds(p).includes(s.id))
+    .map(
+      (s) =>
+        `<option value="${s.id}" ${s.id === (action?.supplier_id ?? relatedSupplier) ? "selected" : ""}>${esc(s.name)}</option>`,
+    )
+    .join(
+      "",
+    )}</select><label><input type="checkbox" name="completed" ${(completion ?? action?.completed) ? "checked" : ""}> Mark action completed</label><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-project-action">Cancel</button><button class="primary">${action ? "Save action" : "Create action"}</button></div></form>`;
+  if (!dialog.open) dialog.showModal();
+  $("#cancel-project-action").onclick = () => dialog.close();
+  $("#project-action-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const fields = Object.fromEntries(new FormData(e.target));
+    fields.supplier_id = fields.supplier_id ? Number(fields.supplier_id) : null;
+    fields.completed = e.target.elements.completed.checked;
+    fields.expected_version = p.version;
+    if (!action) fields.request_id = requestId;
+    const save = e.target.querySelector("button.primary");
+    save.disabled = true;
+    try {
+      await api(
+        `/api/projects/${p.id}/actions${action ? "/" + action.id : ""}`,
+        fields,
+        action ? "PUT" : "POST",
+      );
+      state = await api("/api/state");
+      agentResult = null;
+      agentRequestId++;
+      dialog.close();
+      render();
+      if ($("#tracking-agent") && !$("#tracking-agent").hidden) drawAgent();
+      showNotice(
+        action
+          ? "Action updated."
+          : "Action added and assigned to " + p.owner + ".",
+      );
+    } catch (error) {
+      $("#dialog-error").textContent = error.message;
+      save.disabled = false;
+    }
+  };
+}
+
+function projectActionList(p) {
+  return `<section class="card"><div class="row"><h2>Project actions</h2><button class="primary" data-new-action="${p.id}" ${canEditProject(p) ? "" : "disabled"}>＋ New action</button></div><p>Assigned to ${esc(p.owner)}. Everyone can view; only the owner can update.</p>${actionListRows(projectActions(p, true).map((a) => ({ ...a, project: p.name, owner: p.owner })))}</section>`;
+}
+function actionListRows(actions) {
+  return (
+    actions
+      .map(
+        (a) =>
+          `<div class="next-action"><span class="action-marker ${!a.completed && a.due_date < todayLocal() ? "overdue" : ""}">${a.completed ? "✓" : "○"}</span><div><button class="link" ${actionTrigger(a)}>${esc(a.next_action)}</button><small>${esc(a.project)} · ${esc(a.owner)}</small><small>${esc(actionSupplierName(a))} · ${actionStatus(a)}</small></div><time>${dateLabel(a.due_date)}</time></div>`,
+      )
+      .join("") || "<p>No actions yet.</p>"
+  );
+}
+function supplierActionList(s) {
+  const actions = trackedActions().filter((a) => a.supplier_id === s.id);
+  return `<section class="card section"><div class="row"><h2>Related project actions (${actions.length})</h2><button class="primary" data-new-supplier-action="${s.id}">＋ New action</button></div><p>Actions directly related to ${esc(s.name)}. Each project owner manages their own actions.</p>${actionListRows(actions)}</section>`;
 }
 
 // Used only by the explicitly labeled standalone preview, never the hosted app.
@@ -2972,6 +3211,86 @@ api = async function previewApi(url, body, method = "POST") {
     previewCapacity();
     const { creation_requests, supplier_requests, ...view } = previewData;
     return structuredClone(view);
+  }
+  if (body && url !== "/api/agent/analyze") {
+    const projectMatch = url.match(/^\/api\/projects\/(\d+)(?:\/|$)/);
+    const pid = projectMatch ? Number(projectMatch[1]) : body.project_id;
+    const target = previewData.projects.find((p) => p.id === pid);
+    if (target && target.owner !== currentDemoActor())
+      previewFailure(
+        403,
+        "Only the project owner can update this project. Everyone can view it.",
+      );
+    if (url === "/api/projects" && body.owner !== currentDemoActor())
+      previewFailure(
+        403,
+        "New projects must be owned by the current demo person.",
+      );
+  }
+  const actionMatch = url.match(
+    /^\/api\/projects\/(\d+)\/actions(?:\/([0-9a-f-]+))?$/i,
+  );
+  if (actionMatch) {
+    const p = previewData.projects.find((p) => p.id === Number(actionMatch[1]));
+    if (!p) previewFailure(404, "Project not found");
+    const id = actionMatch[2] || body.request_id;
+    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id || ""))
+      previewFailure(422, "Invalid action identifier");
+    const creating = !actionMatch[2];
+    const actions = p.actions || [];
+    const previous = actions.find((a) => a.id === id);
+    const fields = {
+      title: body.title?.trim(),
+      due_date: body.due_date,
+      supplier_id: body.supplier_id,
+      completed: body.completed,
+    };
+    if (
+      !fields.title ||
+      fields.title.length > 500 ||
+      !/^20(2[6-9]|30)-\d{2}-\d{2}$/.test(fields.due_date || "") ||
+      !Number.isFinite(Date.parse(fields.due_date)) ||
+      new Date(fields.due_date).toISOString().slice(0, 10) !==
+        fields.due_date ||
+      typeof fields.completed !== "boolean"
+    )
+      previewFailure(422, "Check action description and due date.");
+    if (creating && previous) {
+      if (JSON.stringify(previous.creation_payload) !== JSON.stringify(fields))
+        previewFailure(409, "This action request was already used.");
+      return { id };
+    }
+    if (p.version !== body.expected_version)
+      previewFailure(
+        409,
+        "Project changed. Cancel, refresh, and review before saving your action.",
+      );
+    if (
+      fields.supplier_id !== null &&
+      !(p.supplier_ids || [1, 2, 3]).includes(fields.supplier_id)
+    )
+      previewFailure(422, "Choose a linked supplier, or no supplier.");
+    if (!creating && !previous) previewFailure(404, "Action not found");
+    const verb = creating
+      ? "Added"
+      : fields.completed
+        ? "Completed"
+        : previous.completed
+          ? "Reopened"
+          : "Updated";
+    if (creating) {
+      p.actions ||= [];
+      p.actions.push({
+        ...fields,
+        id,
+        updated_on: todayLocal(),
+        creation_payload: { ...fields },
+      });
+    } else Object.assign(previous, fields, { updated_on: todayLocal() });
+    p.version++;
+    previewEvent(p.id, verb + " action: " + fields.title);
+    persistPreview();
+    return { id };
   }
   const assessmentMatch = url.match(/^\/api\/suppliers\/(\d+)\/assessment$/);
   if (assessmentMatch && method === "PUT") {
@@ -3152,6 +3471,20 @@ api = async function previewApi(url, body, method = "POST") {
           owner: p.owner,
         })),
     );
+    actions.push(
+      ...projects.flatMap((p) =>
+        (p.actions || [])
+          .filter((a) => !a.completed)
+          .map((a) => ({
+            ...a,
+            action_id: a.id,
+            next_action: a.title,
+            project_id: p.id,
+            project: p.name,
+            owner: p.owner,
+          })),
+      ),
+    );
     const overdue = actions
       .filter((a) => a.due_date < today)
       .sort(
@@ -3173,13 +3506,16 @@ api = async function previewApi(url, body, method = "POST") {
         .map(([stage, count]) => `${count} ${stage.toLowerCase()}`)
         .join(
           ", ",
-        )}), ${previewData.reservations.filter((r) => projects.some((p) => p.id === r.project_id)).length} sample reservations, and ${overdue.length} overdue supplier actions. ${overdue.length ? "Start with the oldest overdue action and agree a new date with the supplier." : "No overdue supplier actions in this view. Review upcoming sample targets next."}`,
+        )}), ${previewData.reservations.filter((r) => projects.some((p) => p.id === r.project_id)).length} sample reservations, and ${overdue.length} overdue actions. ${overdue.length ? "Start with the oldest overdue action and agree a new date with the supplier." : "No overdue actions in this view. Review upcoming sample targets next."}`,
       overdue_actions: overdue,
-      suggested_followups: overdue.slice(0, 8).map((a) => ({
-        project_id: a.project_id,
-        supplier_id: a.supplier_id,
-        message: `Follow up on ${a.next_action.toLowerCase()} with the supplier; confirm an updated completion date.`,
-      })),
+      suggested_followups: overdue
+        .filter((a) => !a.action_id)
+        .slice(0, 8)
+        .map((a) => ({
+          project_id: a.project_id,
+          supplier_id: a.supplier_id,
+          message: `Follow up on ${a.next_action.toLowerCase()} with the supplier; confirm an updated completion date.`,
+        })),
       upcoming_samples: projects
         .filter((p) => p.sample_due >= today)
         .map((p) => ({
@@ -3332,7 +3668,7 @@ api = async function previewApi(url, body, method = "POST") {
       project_id: body.project_id,
       supplier_id: body.supplier_id,
       quarter: body.quarter,
-      selected_by: "Ryan Morris",
+      selected_by: currentDemoActor(),
       created_at: Math.floor(Date.now() / 1000),
       token: Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) =>
         n.toString(16).padStart(2, "0"),
