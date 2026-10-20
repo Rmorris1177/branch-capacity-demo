@@ -2249,10 +2249,10 @@ function designPage() {
   if (page === "supplier") {
     const s = supplier(),
       rs = reservations(s);
-    return `<div class="row"><div><span class="eyebrow">Suppliers / ${esc(s.name)}</span><h1>${esc(s.name)}</h1></div><div class="page-heading-actions"><span class="pill good"><span class="dot"></span>Development partner</span><button id="link-supplier">Add to project</button></div></div><div class="project-tabs">${["Overview", "Projects", "Communications", "Files"].map((t) => `<button data-supplier-tab="${t}" class="${supplierTab === t ? "active" : ""}">${t}</button>`).join("")}</div>${
+    return `<div class="row"><div><span class="eyebrow">Suppliers / ${esc(s.name)}</span><h1>${esc(s.name)}</h1></div><div class="page-heading-actions"><span class="pill good"><span class="dot"></span>Development partner</span><button id="edit-supplier-capacity" class="primary">Edit capacity & capabilities</button><button id="link-supplier">Add to project</button></div></div><div class="project-tabs">${["Overview", "Projects", "Communications", "Files"].map((t) => `<button data-supplier-tab="${t}" class="${supplierTab === t ? "active" : ""}">${t}</button>`).join("")}</div>${
       supplierTab === "Communications" || supplierTab === "Files"
         ? `<section class="card"><h2>${supplierTab}</h2><p>${supplierTab === "Files" ? "No files attached in this fictional demo." : "No messages have been sent. The tracking assistant prepares internal follow-up suggestions for review."}</p></section>`
-        : `<div class="supplier-profile"><section class="card"><div class="row"><h2>Sourcing pipeline</h2><span class="quiet-link">${supplierProjects(s).length} projects</span></div>${supplierProjects(
+        : `${supplierAssessmentCard(s)}<div class="supplier-profile"><section class="card"><div class="row"><h2>Sourcing pipeline</h2><span class="quiet-link">${supplierProjects(s).length} projects</span></div>${supplierProjects(
             s,
           )
             .map(
@@ -2415,6 +2415,8 @@ function openAgent() {
   $("#agent-question").focus();
 }
 function bindDesign() {
+  if ($("#edit-supplier-capacity"))
+    $("#edit-supplier-capacity").onclick = editSupplierAssessment;
   if ($("#new-supplier")) $("#new-supplier").onclick = newSupplier;
   if ($("#link-supplier")) $("#link-supplier").onclick = addSupplierToProject;
   if ($("#new-project")) $("#new-project").onclick = newProject;
@@ -2808,6 +2810,46 @@ function addSupplierToProject() {
   };
 }
 
+function supplierAssessmentCard(s) {
+  return `<section class="card section"><h2>Capabilities & self-evaluation</h2><p>${esc(s.specialty)}</p><div class="project-metadata"><div><small>Development lead</small><strong>${s.lead} weeks</strong></div><div><small>Production lead</small><strong>${s.production_lead ?? "Not assessed"}${s.production_lead == null ? "" : " weeks"}</strong></div><div><small>Typical MOQ</small><strong>${s.moq ?? "Not assessed"} units</strong></div><div><small>Production capacity</small><strong>${s.production_monthly ?? "Not assessed"} units/month</strong></div></div><p><small>${esc(s.source || "No self-evaluation recorded")}${s.assessment_updated ? " · Reviewed " + esc(s.assessment_updated) : ""}</small></p></section>`;
+}
+function editSupplierAssessment() {
+  const s = supplier(),
+    dialog = $("#planning-dialog");
+  const numberField = (key, label, value, min, max) =>
+    `<label for="assessment-${key}">${label}</label><input id="assessment-${key}" name="${key}" type="number" step="1" min="${min}" max="${max}" value="${value ?? ""}">`;
+  dialog.innerHTML = `<form id="supplier-assessment-form"><h2 id="dialog-title">Capacity & capabilities</h2><p>${esc(s.name)} · Review supplier-reported information before saving.</p><label for="assessment-specialty">Core competencies</label><textarea id="assessment-specialty" name="specialty" required maxlength="160">${esc(s.specialty)}</textarea>${numberField("lead", "Average development / sample lead time (weeks)", s.lead, 1, 52)}${numberField("production_lead", "Average production lead time (weeks)", s.production_lead, 1, 104)}${numberField("moq", "Typical MOQ (units)", s.moq, 0, 1000000000)}${numberField("production_monthly", "Typical production capacity (units per month)", s.production_monthly, 0, 1000000000)}<h3>Quarterly development capacity</h3><p>Total concurrent project slots, including existing workload. Leave blank for Not assessed; zero means no availability. Production units do not count as development slots.</p>${state.quarters.map((q) => numberField(q, q + " total development slots", s.assessments[q], 0, 10000)).join("")}<label for="assessment-source">Assessment source / notes</label><input id="assessment-source" name="source" maxlength="200" value="${esc(s.source || "Manual review")}"><p class="callout">Saving updates capacity warnings immediately. Existing reservations and background workload are preserved, even if the revised limit is lower.</p><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-assessment">Cancel</button><button class="primary">Save reviewed assessment</button></div></form>`;
+  $("#assessment-lead").required = true;
+  dialog.showModal();
+  $("#cancel-assessment").onclick = () => dialog.close();
+  $("#supplier-assessment-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const values = Object.fromEntries(new FormData(e.target));
+    const body = {
+      expected_version: s.version || 1,
+      specialty: values.specialty,
+      source: values.source,
+      assessments: {},
+    };
+    for (const k of ["lead", "production_lead", "moq", "production_monthly"])
+      body[k] = values[k] === "" ? null : Number(values[k]);
+    for (const q of state.quarters)
+      body.assessments[q] = values[q] === "" ? null : Number(values[q]);
+    const save = e.target.querySelector("button.primary");
+    save.disabled = true;
+    try {
+      await api(`/api/suppliers/${s.id}/assessment`, body, "PUT");
+      state = await api("/api/state");
+      dialog.close();
+      go("supplier");
+      showNotice("Assessment saved. Capacity updated; reservations preserved.");
+    } catch (error) {
+      $("#dialog-error").textContent = error.message;
+      save.disabled = false;
+    }
+  };
+}
+
 // Used only by the explicitly labeled standalone preview, never the hosted app.
 const PREVIEW_STORAGE_KEY = "branch-fictional-preview-v1";
 const previewSeed = {"projects": [{"id": 1, "name": "Form task chair", "owner": "Jesse Menayan", "category": "Seating", "status": "Supplier review", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 2, "name": "Gather meeting table", "owner": "Verity Sylvester", "category": "Tables", "status": "Sampling", "description": "Develop a versatile tables collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 3, "name": "Nest lounge chair", "owner": "Mike Riggs", "category": "Seating", "status": "Development", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 4, "name": "Fold desk system", "owner": "Mia Peterson", "category": "Desks", "status": "Development", "description": "Develop a versatile desks collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 5, "name": "Cove privacy screen", "owner": "Chelsea Soochit", "category": "Accessories", "status": "Supplier review", "description": "Develop a versatile accessories collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 6, "name": "Line storage", "owner": "Ryan Morris", "category": "Storage", "status": "Planning", "description": "Develop a versatile storage collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 7, "name": "Compact standing-desk variant", "owner": "Mike Riggs", "category": "Home Office", "status": "Development", "description": "Develop a versatile home office collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}], "suppliers": [{"id": 1, "name": "Northstar Works", "location": "Vietnam", "specialty": "Seating \u00b7 upholstery", "lead": 6, "assessments": {"2026-Q4": 4, "2027-Q1": 3}, "background": {"2026-Q4": 2, "2027-Q1": 1}}, {"id": 2, "name": "Alder Manufacturing", "location": "Taiwan", "specialty": "Seating \u00b7 metalwork", "lead": 8, "assessments": {"2026-Q4": 3, "2027-Q1": 0}, "background": {"2026-Q4": 3}}, {"id": 3, "name": "Fieldwork Studio", "location": "Portugal", "specialty": "Wood \u00b7 upholstery", "lead": 7, "assessments": {}, "background": {"2026-Q4": 1}}], "people": ["Jesse Menayan", "Verity Sylvester", "Mike Riggs", "Mia Peterson", "Chelsea Soochit", "Ryan Morris"], "statuses": ["Planning", "Supplier review", "Development", "Sampling", "On hold", "Complete"], "quarters": ["2026-Q4", "2027-Q1", "2027-Q2", "2027-Q3"], "reservations": [], "capacity": [], "supplier_stages": ["Discussions", "Quoting", "Sample development", "Production planning"], "history": []};
@@ -2908,6 +2950,69 @@ api = async function previewApi(url, body, method = "POST") {
     previewCapacity();
     const { creation_requests, supplier_requests, ...view } = previewData;
     return structuredClone(view);
+  }
+  const assessmentMatch = url.match(/^\/api\/suppliers\/(\d+)\/assessment$/);
+  if (assessmentMatch && method === "PUT") {
+    const s = previewData.suppliers.find(
+      (s) => s.id === Number(assessmentMatch[1]),
+    );
+    if (!s) previewFailure(404, "Supplier not found");
+    if ((s.version || 1) !== body.expected_version)
+      previewFailure(
+        409,
+        "Supplier changed. Cancel, refresh, and review the latest assessment.",
+      );
+    if (
+      !body.specialty?.trim() ||
+      body.specialty.length > 160 ||
+      !Number.isInteger(body.lead) ||
+      body.lead < 1 ||
+      body.lead > 52 ||
+      typeof body.source !== "string" ||
+      body.source.length > 200
+    )
+      previewFailure(422, "Check capabilities, lead time, and source.");
+    for (const [key, max] of [
+      ["production_lead", 104],
+      ["moq", 1000000000],
+      ["production_monthly", 1000000000],
+    ]) {
+      const v = body[key];
+      if (
+        v !== null &&
+        (!Number.isInteger(v) ||
+          v < (key === "production_lead" ? 1 : 0) ||
+          v > max)
+      )
+        previewFailure(422, "Check production values.");
+    }
+    if (
+      !body.assessments ||
+      Object.keys(body.assessments).length !== previewData.quarters.length ||
+      previewData.quarters.some(
+        (q) =>
+          !(q in body.assessments) ||
+          (body.assessments[q] !== null &&
+            (!Number.isInteger(body.assessments[q]) ||
+              body.assessments[q] < 0 ||
+              body.assessments[q] > 10000)),
+      )
+    )
+      previewFailure(422, "Check quarterly capacity.");
+    const { expected_version, ...changes } = body;
+    const updated = {
+      ...s,
+      ...changes,
+      assessments: Object.fromEntries(
+        Object.entries(body.assessments).filter(([, v]) => v !== null),
+      ),
+      version: expected_version + 1,
+      assessment_updated: new Date().toISOString().slice(0, 10),
+    };
+    previewData.suppliers[previewData.suppliers.indexOf(s)] = updated;
+    previewCapacity();
+    persistPreview();
+    return { id: s.id };
   }
   if (url === "/api/suppliers") return createPreviewSupplier(body);
   if (url === "/api/projects") {
