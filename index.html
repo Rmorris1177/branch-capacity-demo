@@ -2280,7 +2280,7 @@ td {
       window.scrollTo(0, 0);
     }
     function steps() {
-      return `<div class="steps">${["project", "comparison", "preview", "selection", "workload"].map((p, i) => `<span class="${page === p ? "current" : ""}">${i + 1}. ${["Project brief", "Compare suppliers", "Capacity preview", "Sample selection", "Supplier workload"][i]}</span>`).join("<span>→</span>")}</div>`;
+      return `<div class="steps">${["project", "comparison", "discussions", "selection", "workload"].map((p, i) => `<span class="${page === p ? "current" : ""}">${i + 1}. ${["Project brief", "Shortlist suppliers", "Discussions", "Sample order (optional)", "Supplier workload"][i]}</span>`).join("<span>→</span>")}</div>`;
     }
     function projectTable() {
       return `<div class="table-wrap"><table><thead><tr><th>Project / category</th><th>Owner</th><th>Stage</th><th></th></tr></thead><tbody>${state.projects.map((p) => `<tr><td><button class="link" data-project="${p.id}">${esc(p.name)}</button><br><small style="color:var(--muted)">${esc(p.category)}</small></td><td>${esc(p.owner)}</td><td><span class="pill">${esc(p.status)}</span></td><td><button data-project="${p.id}" aria-label="Open ${esc(p.name)}">→</button></td></tr>`).join("")}</tbody></table></div>`;
@@ -2331,7 +2331,7 @@ td {
           .join("")}</section></div>`;
       }
       if (page === "comparison") {
-        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Find the right fit.</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Compare candidate partners and save a shortlist. Shortlisting does not reserve capacity.</p><span class="pill">${selected().shortlist.length} shortlisted</span>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample ordered</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div>${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button class="primary" data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
+        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Shortlist suppliers</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Choose potential partners, then confirm your shortlist to begin discussions. This does not place a sample order or use capacity.</p><div class="row"><span class="pill">${selected().shortlist.length} selected for shortlist</span>${shortlistConfirmationButton(selected())}</div>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample ordered</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div>${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
       }
       if (page === "preview" || page === "selection") {
         let s = supplier(),
@@ -2646,8 +2646,11 @@ function art(p, hero = false) {
   return `<div class="product-art uploaded-art concept-art" role="img" aria-label="${esc(p.name)} illustrative concept" title="Illustrative concept image"><img src="${branchImages[key]}" alt="" loading="${hero ? "eager" : "lazy"}"></div>`;
 }
 function stagePill(stage) {
-  const type =
-    stage === "Quoting" ? "warn" : stage === "Discussions" ? "neutral" : "good";
+  const type = ["Quoting", "Declined to bid"].includes(stage)
+    ? "warn"
+    : ["Discussions", "Interest review"].includes(stage)
+      ? "neutral"
+      : "good";
   return `<span class="pill ${type}"><span class="dot"></span>${esc(stage)}</span>`;
 }
 function projectStage(p) {
@@ -2738,7 +2741,7 @@ function projectRows(projects) {
 }
 function reservationList(p) {
   const rows = state.reservations.filter((r) => r.project_id === p.id);
-  return `<section class="card section"><div class="card-heading"><h2>Sample orders (${rows.length})</h2></div><div class="reserve-list">${rows.map((r) => `<div class="supplier row"><div><strong>${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)}</strong><p class="page-subtitle">${r.quarter} · Prototype sample · ${r.selected_by}</p></div>${cancelButton(r)}</div>`).join("") || "<p>No sample orders yet. Compare partners to begin.</p>"}</div></section>`;
+  return `<section class="card section"><div class="card-heading"><h2>Sample orders (${rows.length})</h2></div><div class="reserve-list">${rows.map((r) => `<div class="supplier row"><div><strong>${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)}</strong><p class="page-subtitle">${r.quarter} · Prototype sample · ${r.selected_by}</p></div>${cancelButton(r)}</div>`).join("") || "<p>No sample orders placed. Confirm a shortlist to start discussions; order a sample only when ready.</p>"}</div></section>`;
 }
 function projectSupplierIds(p) {
   return (p.supplier_ids || [1, 2, 3]).filter(
@@ -2749,7 +2752,7 @@ function supplierTable(p) {
   const candidates = state.suppliers.filter((s) =>
     projectSupplierIds(p).includes(s.id),
   );
-  return `<section class="card"><div class="card-heading"><h2>Potential suppliers (${candidates.length})</h2><div class="page-heading-actions"><button id="new-supplier">＋ New supplier</button><button class="primary" data-go="comparison" aria-label="Compare suppliers">Add existing supplier</button></div></div><div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${candidates
+  return `<section class="card"><div class="card-heading"><h2>Potential suppliers (${candidates.length})</h2><div class="page-heading-actions"><button id="new-supplier">＋ New supplier</button><button data-go="comparison" aria-label="Compare suppliers">Choose suppliers</button>${shortlistConfirmationButton(p)}</div></div>${shortlistDiscussionSummary(p)}<div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${candidates
     .map((s) => {
       const d = p.supplier_details[String(s.id)],
         reserved = state.reservations.some(
@@ -3000,6 +3003,16 @@ function openAgent() {
   $("#agent-question").focus();
 }
 function bindDesign() {
+  document.querySelectorAll("[data-confirm-shortlist]").forEach(
+    (button) =>
+      (button.onclick = () =>
+        confirmProjectShortlist(
+          state.projects.find(
+            (p) => p.id === Number(button.dataset.confirmShortlist),
+          ),
+          button,
+        )),
+  );
   if ($("#supplier-project-quarter"))
     $("#supplier-project-quarter").onchange = (e) => {
       supplierProjectQuarter = e.target.value;
@@ -3343,7 +3356,7 @@ function newProject() {
         : quarterStart;
   const sample = new Date(end + "T12:00:00Z");
   sample.setUTCDate(sample.getUTCDate() - 14);
-  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief. Add supplier candidates now or later; sample selection reserves capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><label for="new-image">Project image (optional)</label><input id="new-image" type="file" accept="image/jpeg,image/png,image/webp"><p class="image-help">Choose a JPG, PNG, or WebP up to 10 MB. Images are resized for the demo.</p><div id="new-image-preview" hidden><img alt="Selected project image preview"><button type="button" id="remove-new-image">Remove image</button></div><p id="image-status" role="status"></p><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner"><option>${esc(currentDemoActor())}</option></select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div>${commercialFields({}, "new")}<label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2030-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2030-12-31" value="${end}"></div></div>${milestoneFields({ sample_due: sample.toISOString().slice(0, 10) }, "new")}<fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${esc(s.name)} <small>· ${esc(s.specialty)}</small></label>`).join("")}<small>These are candidates only. No sample orders are created.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
+  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief and potential suppliers. Confirm a shortlist to begin discussions. This does not place a sample order or use capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><label for="new-image">Project image (optional)</label><input id="new-image" type="file" accept="image/jpeg,image/png,image/webp"><p class="image-help">Choose a JPG, PNG, or WebP up to 10 MB. Images are resized for the demo.</p><div id="new-image-preview" hidden><img alt="Selected project image preview"><button type="button" id="remove-new-image">Remove image</button></div><p id="image-status" role="status"></p><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner"><option>${esc(currentDemoActor())}</option></select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div>${commercialFields({}, "new")}<label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2030-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2030-12-31" value="${end}"></div></div>${milestoneFields({ sample_due: sample.toISOString().slice(0, 10) }, "new")}<fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${esc(s.name)} <small>· ${esc(s.specialty)}</small></label>`).join("")}<small>Potential suppliers only. You will confirm the shortlist for discussions after creating the project.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
   dialog.showModal();
   $("#cancel-new-project").onclick = () => dialog.close();
   let imageRequest = 0;
@@ -3424,11 +3437,11 @@ function newProject() {
       const created = await api("/api/projects", body);
       state = await api("/api/state");
       projectId = created.id;
-      projectTab = "overview";
+      projectTab = body.supplier_ids.length ? "suppliers" : "overview";
       dialog.close();
       go("project");
       showNotice(
-        "Project created. Add supplier candidates to begin development.",
+        "Project created. Confirm a shortlist when ready to begin supplier discussions.",
       );
     } catch (error) {
       $("#dialog-error").textContent = error.message;
@@ -4422,9 +4435,43 @@ function capacityQuarterControl(label = "Capacity quarter") {
   return `<div class="capacity-quarter-control"><label for="quarter">Capacity quarter</label><select id="quarter" aria-label="${esc(label)}" title="Filters project lists, development workload and sample orders">${state.quarters.map((q) => `<option value="${q}" ${q === quarter ? "selected" : ""}>${q.slice(5)} · ${q.slice(0, 4)}</option>`).join("")}</select></div>`;
 }
 
+function shortlistIsConfirmed(p) {
+  const saved = p.shortlist_confirmation;
+  return (
+    !!saved &&
+    saved.supplier_ids.length === p.shortlist.length &&
+    p.shortlist.every((id) => saved.supplier_ids.includes(id))
+  );
+}
+function shortlistConfirmationButton(p) {
+  return `<button class="primary" data-confirm-shortlist="${p.id}" ${!p.shortlist.length || !canEditProject(p) || shortlistIsConfirmed(p) ? "disabled" : ""}>${shortlistIsConfirmed(p) ? "Shortlist confirmed" : "Confirm shortlist"}</button>`;
+}
+function shortlistDiscussionSummary(p) {
+  return `<div class="callout discussion-summary"><strong>${shortlistIsConfirmed(p) ? "Shortlist confirmed for discussions" : "Potential suppliers · Shortlist not yet confirmed"}</strong><p>${shortlistIsConfirmed(p) ? p.shortlist.map((sid) => esc(state.suppliers.find((s) => s.id === sid)?.name)).join(", ") : "Choose potential suppliers, then confirm your shortlist to begin discussions."}</p><small>No sample order has been placed by this step. Discussions and quoting do not use capacity. Place a sample order separately when you are ready.</small></div>`;
+}
+async function confirmProjectShortlist(p, button) {
+  button.disabled = true;
+  try {
+    await api(`/api/projects/${p.id}/shortlist/confirm`, {
+      expected_version: p.version,
+    });
+    state = await api("/api/state");
+    projectId = p.id;
+    projectTab = "suppliers";
+    agentResult = null;
+    go("project");
+    showNotice(
+      "Shortlist confirmed for discussions. No sample order placed; capacity unchanged.",
+    );
+  } catch (error) {
+    button.disabled = false;
+    showNotice(error.message);
+  }
+}
+
 // Used only by the explicitly labeled standalone preview, never the hosted app.
 const PREVIEW_STORAGE_KEY = "branch-fictional-preview-v1";
-const previewSeed = {"projects": [{"id": 1, "name": "Form task chair", "owner": "Jesse Menayan", "category": "Seating", "status": "Supplier review", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 2, "name": "Gather meeting table", "owner": "Verity Sylvester", "category": "Tables", "status": "Sampling", "description": "Develop a versatile tables collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 3, "name": "Nest lounge chair", "owner": "Mike Riggs", "category": "Seating", "status": "Development", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 4, "name": "Fold desk system", "owner": "Mia Peterson", "category": "Desks", "status": "Development", "description": "Develop a versatile desks collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 5, "name": "Cove privacy screen", "owner": "Chelsea Soochit", "category": "Accessories", "status": "Supplier review", "description": "Develop a versatile accessories collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 6, "name": "Line storage", "owner": "Ryan Morris", "category": "Storage", "status": "Planning", "description": "Develop a versatile storage collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 7, "name": "Compact standing-desk variant", "owner": "Mike Riggs", "category": "Home Office", "status": "Development", "description": "Develop a versatile home office collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"demo_key": "sourcing-arc-stool", "name": "Arc counter stool", "owner": "Jesse Menayan", "category": "Seating", "description": "A compact upholstered counter stool with a formed steel base. Compare upholstery, metalwork, MOQ, and sample lead times.", "id": 8, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-trail-table", "name": "Trail folding worktable", "owner": "Verity Sylvester", "category": "Tables", "description": "A flexible folding table with a durable wood top. Find partners for wood finishing, folding mechanisms, and pilot production.", "id": 9, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-haven-screen", "name": "Haven acoustic screen", "owner": "Mia Peterson", "category": "Accessories", "description": "A freestanding acoustic screen for shared workspaces. Compare textile construction, acoustic materials, and development capacity.", "id": 10, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}], "suppliers": [{"id": 1, "name": "Northstar Works", "location": "Vietnam", "specialty": "Seating \u00b7 upholstery", "lead": 6, "assessments": {"2026-Q4": 4, "2027-Q1": 3}, "background": {"2026-Q4": 2, "2027-Q1": 1}}, {"id": 2, "name": "Alder Manufacturing", "location": "Taiwan", "specialty": "Seating \u00b7 metalwork", "lead": 8, "assessments": {"2026-Q4": 3, "2027-Q1": 0}, "background": {"2026-Q4": 3}}, {"id": 3, "name": "Fieldwork Studio", "location": "Portugal", "specialty": "Wood \u00b7 upholstery", "lead": 7, "assessments": {}, "background": {"2026-Q4": 1}}], "people": ["Jesse Menayan", "Verity Sylvester", "Mike Riggs", "Mia Peterson", "Chelsea Soochit", "Ryan Morris"], "statuses": ["Planning", "Supplier review", "Development", "Sampling", "On hold", "Complete"], "quarters": ["2026-Q4", "2027-Q1", "2027-Q2", "2027-Q3"], "reservations": [], "capacity": [], "supplier_stages": ["Discussions", "Quoting", "Sample development", "Production planning", "Declined to bid"], "history": []};
+const previewSeed = {"projects": [{"id": 1, "name": "Form task chair", "owner": "Jesse Menayan", "category": "Seating", "status": "Supplier review", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 2, "name": "Gather meeting table", "owner": "Verity Sylvester", "category": "Tables", "status": "Sampling", "description": "Develop a versatile tables collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 3, "name": "Nest lounge chair", "owner": "Mike Riggs", "category": "Seating", "status": "Development", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 4, "name": "Fold desk system", "owner": "Mia Peterson", "category": "Desks", "status": "Development", "description": "Develop a versatile desks collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 5, "name": "Cove privacy screen", "owner": "Chelsea Soochit", "category": "Accessories", "status": "Supplier review", "description": "Develop a versatile accessories collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 6, "name": "Line storage", "owner": "Ryan Morris", "category": "Storage", "status": "Planning", "description": "Develop a versatile storage collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 7, "name": "Compact standing-desk variant", "owner": "Mike Riggs", "category": "Home Office", "status": "Development", "description": "Develop a versatile home office collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"demo_key": "sourcing-arc-stool", "name": "Arc counter stool", "owner": "Jesse Menayan", "category": "Seating", "description": "A compact upholstered counter stool with a formed steel base. Compare upholstery, metalwork, MOQ, and sample lead times.", "id": 8, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-trail-table", "name": "Trail folding worktable", "owner": "Verity Sylvester", "category": "Tables", "description": "A flexible folding table with a durable wood top. Find partners for wood finishing, folding mechanisms, and pilot production.", "id": 9, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-haven-screen", "name": "Haven acoustic screen", "owner": "Mia Peterson", "category": "Accessories", "description": "A freestanding acoustic screen for shared workspaces. Compare textile construction, acoustic materials, and development capacity.", "id": 10, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}], "suppliers": [{"id": 1, "name": "Northstar Works", "location": "Vietnam", "specialty": "Seating \u00b7 upholstery", "lead": 6, "assessments": {"2026-Q4": 4, "2027-Q1": 3}, "background": {"2026-Q4": 2, "2027-Q1": 1}}, {"id": 2, "name": "Alder Manufacturing", "location": "Taiwan", "specialty": "Seating \u00b7 metalwork", "lead": 8, "assessments": {"2026-Q4": 3, "2027-Q1": 0}, "background": {"2026-Q4": 3}}, {"id": 3, "name": "Fieldwork Studio", "location": "Portugal", "specialty": "Wood \u00b7 upholstery", "lead": 7, "assessments": {}, "background": {"2026-Q4": 1}}], "people": ["Jesse Menayan", "Verity Sylvester", "Mike Riggs", "Mia Peterson", "Chelsea Soochit", "Ryan Morris"], "statuses": ["Planning", "Supplier review", "Development", "Sampling", "On hold", "Complete"], "quarters": ["2026-Q4", "2027-Q1", "2027-Q2", "2027-Q3"], "reservations": [], "capacity": [], "supplier_stages": ["Interest review", "Discussions", "Quoting", "Sample development", "Production planning", "Declined to bid"], "history": []};
 let previewData;
 let previewWriteSnapshot;
 try {
@@ -4442,7 +4489,8 @@ function hydratePreview() {
   previewData.history ||= [];
   previewData.creation_requests ||= {};
   previewData.supplier_requests ||= {};
-  previewData.supplier_stages ||= previewSeed.supplier_stages;
+  // Stage choices are application configuration, including newly supported phases.
+  previewData.supplier_stages = [...previewSeed.supplier_stages];
   for (const p of previewData.projects) {
     p.supplier_details ||= structuredClone(
       previewSeed.projects.find((seed) => seed.id === p.id)?.supplier_details ||
@@ -4577,6 +4625,51 @@ api = async function previewApi(url, body, method = "POST") {
         422,
         "Choose a valid project image using the image picker.",
       );
+  }
+  const confirmation = url.match(
+    /^\/api\/projects\/(\d+)\/shortlist\/confirm$/,
+  );
+  if (confirmation && method === "POST") {
+    const p = previewData.projects.find((p) => p.id === +confirmation[1]);
+    if (!p) previewFailure(404, "Project not found");
+    if (p.version !== body.expected_version)
+      previewFailure(
+        409,
+        "Project changed. Refresh and review the shortlist before confirming.",
+      );
+    if (!p.shortlist.length)
+      previewFailure(422, "Choose at least one supplier for discussions");
+    if (
+      p.shortlist.some(
+        (sid) =>
+          !projectSupplierIds(p).includes(sid) ||
+          p.supplier_details[String(sid)].stage === "Declined to bid",
+      )
+    )
+      previewFailure(422, "Choose active supplier candidates");
+    p.shortlist_confirmation = {
+      supplier_ids: [...p.shortlist],
+      confirmed_by: currentDemoActor(),
+      confirmed_on: todayLocal(),
+    };
+    for (const sid of p.shortlist) {
+      const d = p.supplier_details[String(sid)];
+      if (d.stage === "Interest review")
+        Object.assign(d, { stage: "Discussions", updated_on: todayLocal() });
+    }
+    p.version++;
+    previewEvent(
+      p.id,
+      "Confirmed shortlist for discussions · " +
+        p.shortlist
+          .map((sid) => previewData.suppliers.find((s) => s.id === sid).name)
+          .join(", ") +
+        " · By " +
+        currentDemoActor() +
+        " · No sample order or capacity allocation",
+    );
+    persistPreview();
+    return { saved: true };
   }
   const actionMatch = url.match(
     /^\/api\/projects\/(\d+)\/actions(?:\/([0-9a-f-]+))?$/i,
@@ -4796,7 +4889,7 @@ api = async function previewApi(url, body, method = "POST") {
         previewData.suppliers.map((s) => [
           String(s.id),
           {
-            stage: "Discussions",
+            stage: "Interest review",
             next_action: "",
             due_date: body.sample_due,
             completed: false,
@@ -5075,6 +5168,7 @@ api = async function previewApi(url, body, method = "POST") {
         previewFailure(422, "Choose distinct listed suppliers");
       attachPreviewCandidates(p, body.supplier_ids);
       p.shortlist = [...body.supplier_ids];
+      p.shortlist_confirmation = null;
     } else {
       if (
         !body.name?.trim() ||
@@ -5234,7 +5328,7 @@ function attachPreviewCandidates(project, ids) {
   ];
   for (const id of ids)
     project.supplier_details[String(id)] ||= {
-      stage: "Discussions",
+      stage: "Interest review",
       next_action: "",
       due_date: project.sample_due,
       completed: false,
@@ -5498,6 +5592,23 @@ function validateRestoreBackup(backup) {
       restoreProblem("Project dates or launch year are inconsistent.");
     if (p.shortlist.some((id) => !p.supplier_ids.includes(id)))
       restoreProblem("Shortlist contains an unlinked supplier.");
+    if (raw.shortlist_confirmation != null) {
+      const saved = restoreObject(
+        raw.shortlist_confirmation,
+        "Shortlist confirmation",
+      );
+      const chosen = ids(saved.supplier_ids, "Confirmed shortlist");
+      if (!chosen.length || !people.includes(saved.confirmed_by))
+        restoreProblem("Invalid shortlist confirmation");
+      p.shortlist_confirmation = {
+        supplier_ids: chosen,
+        confirmed_by: saved.confirmed_by,
+        confirmed_on: restoreDate(
+          saved.confirmed_on,
+          "shortlist confirmation date",
+        ),
+      };
+    }
     if (raw.image_data != null) {
       if (!validProjectImage(raw.image_data))
         restoreProblem("Project image is invalid.");
