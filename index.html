@@ -2359,7 +2359,7 @@ td {
           .join("")}</section></div>`;
       }
       if (page === "comparison") {
-        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Shortlist suppliers</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Choose potential partners, then confirm your shortlist to begin discussions. This does not place a sample order or use capacity.</p><div class="row"><span class="pill">${selected().shortlist.length} selected for shortlist</span>${shortlistConfirmationButton(selected())}</div>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample ordered</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${quarter === "all" ? "By quarter" : (limit(s) ?? "Not assessed")}</strong>${bar(s)}</div>${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
+        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Shortlist suppliers</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Choose potential partners, then confirm your shortlist to begin discussions. This does not place a sample order or use capacity.</p><div class="row"><span class="pill">${pendingShortlistIds(selected()).length} new candidates selected</span>${shortlistConfirmationButton(selected())}</div>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${supplierDiscussionConfirmed(selected(), s.id) ? (selected().shortlist.includes(s.id) ? "Confirmed · Comparing" : "Confirmed · Compare") : selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample ordered</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${quarter === "all" ? "By quarter" : (limit(s) ?? "Not assessed")}</strong>${bar(s)}</div>${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
       }
       if (page === "preview" || page === "selection") {
         let s = supplier(),
@@ -2787,7 +2787,7 @@ function projectRows(projects) {
 }
 function reservationList(p) {
   const rows = state.reservations.filter((r) => r.project_id === p.id);
-  return `<section class="card section"><div class="card-heading"><h2>Sample orders (${rows.length})</h2></div><div class="reserve-list">${rows.map((r) => `<div class="supplier row"><div><strong>${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)}</strong><p class="page-subtitle">${r.quarter} · Prototype sample · ${r.selected_by}</p></div>${cancelButton(r)}</div>`).join("") || "<p>No sample orders placed. Confirm a shortlist to start discussions; order a sample only when ready.</p>"}</div></section>`;
+  return `<section class="card section"><div class="card-heading"><h2>Sample orders (${rows.length})</h2></div><div class="reserve-list">${rows.map((r) => `<div class="supplier row"><div><strong>${esc(state.suppliers.find((s) => s.id === r.supplier_id).name)}</strong><p class="page-subtitle">${r.quarter} · Prototype sample · ${r.selected_by}</p></div>${cancelButton(r)}</div>`).join("") || "<p>No sample orders placed. Order a sample separately when ready.</p>"}</div></section>`;
 }
 function projectSupplierIds(p) {
   return (p.supplier_ids || [1, 2, 3]).filter(
@@ -2798,7 +2798,7 @@ function supplierTable(p) {
   const candidates = state.suppliers.filter((s) =>
     projectSupplierIds(p).includes(s.id),
   );
-  return `<section class="card"><div class="card-heading"><h2>Potential suppliers (${candidates.length})</h2><div class="page-heading-actions"><button id="new-supplier">＋ New supplier</button><button data-go="comparison" aria-label="Compare suppliers">Choose suppliers</button>${shortlistConfirmationButton(p)}</div></div>${shortlistDiscussionSummary(p)}<div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${candidates
+  return `<section class="card"><div class="card-heading"><h2>Project suppliers (${candidates.length})</h2><div class="page-heading-actions"><button id="new-supplier">＋ New supplier</button><button data-go="comparison" aria-label="Compare suppliers">Choose suppliers</button>${shortlistConfirmationButton(p)}</div></div>${shortlistDiscussionSummary(p)}<div class="table-wrap"><table class="supplier-table"><thead><tr><th>Supplier</th><th>Stage</th><th>Next action</th><th>Last updated</th><th></th></tr></thead><tbody>${candidates
     .map((s) => {
       const d = p.supplier_details[String(s.id)],
         reserved = state.reservations.some(
@@ -2807,7 +2807,7 @@ function supplierTable(p) {
             r.supplier_id === s.id &&
             (!supplierProjectQuarter || r.quarter === supplierProjectQuarter),
         );
-      return `<tr><td><button class="link" data-profile="${s.id}">${esc(s.name)}</button>${p.shortlist.includes(s.id) ? "<small>Shortlisted</small>" : ""}</td><td>${stagePill(d.stage)}${["Declined to bid", "No longer pursuing"].includes(d.stage) ? `<small>Reason: ${esc(d.decline_reason)}</small>` : ""} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${esc(s.name)}">Edit</button><button class="tiny" data-remove-supplier="${p.id}:${s.id}" ${canManageSupplier(p) ? "" : "disabled"}>Remove</button></td></tr>`;
+      return `<tr><td><button class="link" data-profile="${s.id}">${esc(s.name)}</button>${supplierDiscussionConfirmed(p, s.id) ? "<small>Confirmed shortlist</small>" : supplierDiscussionClosed(p, s.id) ? "" : "<small>Candidate</small>"}</td><td>${stagePill(d.stage)}${["Declined to bid", "No longer pursuing"].includes(d.stage) ? `<small>Reason: ${esc(d.decline_reason)}</small>` : ""} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${esc(s.name)}">Edit</button><button class="tiny" data-remove-supplier="${p.id}:${s.id}" ${canManageSupplier(p) ? "" : "disabled"}>Remove</button></td></tr>`;
     })
     .join(
       "",
@@ -4563,19 +4563,60 @@ function capacityQuarterControl(label = "Capacity quarter") {
   return `<div class="capacity-quarter-control"><label for="quarter">Capacity quarter</label><select id="quarter" aria-label="${esc(label)}" title="Filters project lists, development workload and sample orders">${["preview", "selection"].includes(page) ? "" : `<option value="all" ${quarter === "all" ? "selected" : ""}>Show all</option>`}${state.quarters.map((q) => `<option value="${q}" ${q === quarter ? "selected" : ""}>${q.slice(5)} · ${q.slice(0, 4)}</option>`).join("")}${state.quarters.at(-1) < "2035-Q4" ? '<option value="add-quarter">＋ Add next quarter…</option>' : ""}</select></div>`;
 }
 
-function shortlistIsConfirmed(p) {
-  const saved = p.shortlist_confirmation;
+function supplierDiscussionClosed(p, sid) {
+  const d = p.supplier_details?.[String(sid)];
   return (
-    !!saved &&
-    saved.supplier_ids.length === p.shortlist.length &&
-    p.shortlist.every((id) => saved.supplier_ids.includes(id))
+    !!d?.removed || ["Declined to bid", "No longer pursuing"].includes(d?.stage)
+  );
+}
+function supplierDiscussionConfirmed(p, sid) {
+  if (supplierDiscussionClosed(p, sid)) return false;
+  const d = p.supplier_details?.[String(sid)];
+  return (
+    [
+      "Discussions",
+      "Quoting",
+      "Sample development",
+      "Production planning",
+    ].includes(d?.stage) ||
+    !!d?.next_action?.trim() ||
+    (p.actions || []).some((a) => a.supplier_id === sid) ||
+    (p.shortlist_confirmation?.supplier_ids || []).includes(sid) ||
+    state.reservations.some(
+      (r) => r.project_id === p.id && r.supplier_id === sid,
+    )
+  );
+}
+function pendingShortlistIds(p) {
+  return p.shortlist.filter(
+    (sid) =>
+      !supplierDiscussionClosed(p, sid) && !supplierDiscussionConfirmed(p, sid),
+  );
+}
+function shortlistIsConfirmed(p) {
+  return (
+    !pendingShortlistIds(p).length &&
+    projectSupplierIds(p).some((sid) => supplierDiscussionConfirmed(p, sid))
   );
 }
 function shortlistConfirmationButton(p) {
-  return `<button class="primary" data-confirm-shortlist="${p.id}" ${!p.shortlist.length || !canEditProject(p) || shortlistIsConfirmed(p) ? "disabled" : ""}>${shortlistIsConfirmed(p) ? "Shortlist confirmed" : "Confirm shortlist"}</button>`;
+  if (!pendingShortlistIds(p).length) return "";
+  return `<button class="primary" data-confirm-shortlist="${p.id}" ${canEditProject(p) ? "" : "disabled"}>Confirm shortlist</button>`;
 }
 function shortlistDiscussionSummary(p) {
-  return `<div class="callout discussion-summary"><strong>${shortlistIsConfirmed(p) ? "Shortlist confirmed for discussions" : "Potential suppliers · Shortlist not yet confirmed"}</strong><p>${shortlistIsConfirmed(p) ? p.shortlist.map((sid) => esc(state.suppliers.find((s) => s.id === sid)?.name)).join(", ") : "Choose potential suppliers, then confirm your shortlist to begin discussions."}</p><small>No sample order has been placed by this step. Discussions and quoting do not use capacity. Place a sample order separately when you are ready.</small></div>`;
+  const active = projectSupplierIds(p).filter(
+    (sid) => !supplierDiscussionClosed(p, sid),
+  );
+  const confirmed = active.filter((sid) => supplierDiscussionConfirmed(p, sid));
+  const pending = active.filter((sid) => !supplierDiscussionConfirmed(p, sid));
+  const names = confirmed
+    .map((sid) => esc(state.suppliers.find((s) => s.id === sid)?.name))
+    .join(", ");
+  if (!pending.length)
+    return confirmed.length
+      ? `<p class="dialog-info discussion-summary"><strong>Shortlist confirmed for discussions</strong> · ${names}. Discussions and quoting do not use capacity.</p>`
+      : `<p class="dialog-info discussion-summary">No active supplier discussions. Choose suppliers to add new candidates.</p>`;
+  return `<div class="callout discussion-summary">${confirmed.length ? `<p><strong>Confirmed suppliers (${confirmed.length})</strong> · ${names}</p>` : ""}<strong>${pending.length} ${pending.length === 1 ? "candidate awaits" : "candidates await"} shortlist confirmation</strong><p>Choose new candidates and confirm them to begin discussions. Existing supplier discussions remain confirmed.</p><small>Confirming new candidates does not place a sample order or use capacity.</small></div>`;
 }
 async function confirmProjectShortlist(p, button) {
   button.disabled = true;
