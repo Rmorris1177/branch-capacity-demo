@@ -2370,8 +2370,12 @@ td {
       if ($("#quarter"))
         $("#quarter").onchange = (e) => {
           quarter = e.target.value;
+          agentResult = null;
+          agentBusy = false;
+          agentRequestId++;
           saveLocation();
           render();
+          if ($("#tracking-agent") && !$("#tracking-agent").hidden) drawAgent();
         };
       if ($("#reserve"))
         $("#reserve").onclick = async () => {
@@ -2682,7 +2686,11 @@ function allActions() {
     );
 }
 function nextActions(p, limit = 3) {
-  const actions = p ? projectActions(p) : allActions();
+  const actions = p
+    ? projectActions(p)
+    : allActions().filter((a) =>
+        projectsInPeriod().some((p) => p.id === a.project_id),
+      );
   return (
     actions
       .slice(0, limit)
@@ -2695,7 +2703,9 @@ function nextActions(p, limit = 3) {
 }
 function agentCard(p) {
   const overdue = (p ? projectActions(p) : allActions()).filter(
-    (a) => a.due_date < todayLocal(),
+    (a) =>
+      a.due_date < todayLocal() &&
+      (p || projectsInPeriod().some((project) => project.id === a.project_id)),
   );
   return `<section class="card agent-card section"><div class="agent-layout"><span class="agent-symbol">✧</span><div><h2>Branch AI</h2><span class="agent-mode">Project tracking assistant</span></div></div><p>${overdue.length ? `${overdue.length} actions need a follow-up. Review what’s overdue and plan the next step.` : "Keep the next milestone in sight. Review project status and upcoming follow-ups."}</p><button class="primary" data-agent>Review with assistant →</button></section>`;
 }
@@ -2724,7 +2734,10 @@ function supplierTable(p) {
     .map((s) => {
       const d = p.supplier_details[String(s.id)],
         reserved = state.reservations.some(
-          (r) => r.project_id === p.id && r.supplier_id === s.id,
+          (r) =>
+            r.project_id === p.id &&
+            r.supplier_id === s.id &&
+            r.quarter === quarter,
         );
       return `<tr><td><button class="link" data-profile="${s.id}">${esc(s.name)}</button>${p.shortlist.includes(s.id) ? "<small>Shortlisted</small>" : ""}</td><td>${stagePill(d.stage)}${d.stage === "Declined to bid" ? `<small>Reason: ${esc(d.decline_reason)}</small>` : ""} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${esc(s.name)}">Edit</button><button class="tiny" data-remove-supplier="${p.id}:${s.id}" ${canManageSupplier(p) ? "" : "disabled"}>Remove</button></td></tr>`;
     })
@@ -2733,7 +2746,7 @@ function supplierTable(p) {
     )}</tbody></table></div>${candidates.length ? "" : '<p class="empty" style="padding:16px">No supplier candidates yet. Use Add supplier to compare partners.</p>'}</section>${removedSuppliers(p)}`;
 }
 function supplierProjects(s) {
-  return state.projects.filter((p) => projectSupplierIds(p).includes(s.id));
+  return projectsInPeriod().filter((p) => projectSupplierIds(p).includes(s.id));
 }
 function designPage() {
   if (page === "actions") return actionsPage();
@@ -2744,7 +2757,7 @@ function designPage() {
     const ordered = [...projectsInPeriod()].sort(
       (a, b) => (b.id === 7) - (a.id === 7),
     );
-    return `<div class="row"><h1>Projects</h1><div class="page-heading-actions"><button id="filter-projects">Filter projects${projectPeriod.year ? " · " + projectPeriod.year + (projectPeriod.quarter ? " Q" + projectPeriod.quarter : "") : ""}</button><button class="primary" id="new-project">＋ New project</button>${capacityQuarterControl("Capacity quarter")}</div></div><div class="dashboard-layout"><section>${projectPeriodSummary(ordered.length)}${sourcingPipeline(projectsInPeriod())}<div class="row"><h2>Projects</h2><input class="search-projects" id="project-search" type="search" aria-label="Search projects" placeholder="Search projects…"></div><div id="project-results" class="project-list">${projectRows(ordered) || '<p class="empty">No projects match this development period. Clear the filters or choose another quarter.</p>'}</div></section><section><div class="card"><div class="row"><h2>Next actions</h2><button class="quiet-link" data-open-actions="">View all</button></div>${nextActions(null, 3)}</div>${agentCard(null)}<div class="card section"><div class="row"><h2>Quarterly capacity</h2><button class="quiet-link" data-go="workload">View details</button></div>${state.suppliers.map((s) => `<div class="supplier"><div class="row"><small>${esc(s.name)}</small>${badge(s)}</div>${bar(s)}<small>${load(s)} scheduled · ${limit(s) ?? "Not assessed"} ${limit(s) === null ? "" : "slots"}</small></div>`).join("")}</div></section></div>`;
+    return `<div class="row"><h1>Projects</h1><div class="page-heading-actions"><button class="primary" id="new-project">＋ New project</button>${capacityQuarterControl("Capacity quarter")}</div></div><div class="dashboard-layout"><section>${projectPeriodSummary(ordered.length)}${sourcingPipeline(projectsInPeriod())}<div class="row"><h2>Projects</h2><input class="search-projects" id="project-search" type="search" aria-label="Search projects" placeholder="Search projects…"></div><div id="project-results" class="project-list">${projectRows(ordered) || '<p class="empty">No projects in this quarter. Choose another capacity quarter.</p>'}</div></section><section><div class="card"><div class="row"><h2>Next actions</h2><button class="quiet-link" data-open-actions="">View all</button></div>${nextActions(null, 3)}</div>${agentCard(null)}<div class="card section"><div class="row"><h2>Quarterly capacity</h2><button class="quiet-link" data-go="workload">View details</button></div>${state.suppliers.map((s) => `<div class="supplier"><div class="row"><small>${esc(s.name)}</small>${badge(s)}</div>${bar(s)}<small>${load(s)} scheduled · ${limit(s) ?? "Not assessed"} ${limit(s) === null ? "" : "slots"}</small></div>`).join("")}</div></section></div>`;
   }
   if (page === "project") {
     const p = selected();
@@ -2890,7 +2903,7 @@ function agentEvidence() {
 }
 function drawAgent() {
   const panel = $("#tracking-agent");
-  panel.innerHTML = `<div class="agent-head"><div class="row"><div><h2>✧ Branch AI</h2><span class="agent-mode">${agentResult?.mode === "live" ? "Live AI · Project tracking" : "Demo insights · Project tracking"}</span></div><button id="close-agent" aria-label="Close tracking assistant">×</button></div><p>Keep projects moving, one follow-up at a time.</p><small class="agent-scope">${typeof agentScope === "string" ? esc(agentScope.slice("developer:".length)) + " · Developer projects" : agentScope === null ? "All projects" : esc(state.projects.find((p) => p.id === agentScope)?.name || "Project")} · Saved project data</small><textarea id="agent-question" aria-label="Ask the tracking assistant" placeholder="Summarize status and flag overdue actions…"></textarea><div class="agent-question"><button class="primary" id="analyze-project" ${agentBusy ? "disabled" : ""}>${agentBusy ? "Reviewing…" : "Review project status"}</button></div></div><div class="agent-content" id="agent-content">${agentBusy ? '<p role="status">Reviewing saved project status and supplier actions…</p>' : agentResult ? `<p>${esc(agentResult.summary)}</p>${agentEvidence()}${agentResult.developer ? `<h3>Saved-data recommendations</h3>${(agentResult.recommendations || []).map((r) => `<div class="suggestion"><p>${esc(r.message)}</p><button data-project="${r.project_id}" class="quiet-link">Open project →</button></div>`).join("") || "<p>No active projects to recommend next steps for.</p>"}` : ""}<span class="eyebrow">${agentResult.mode === "live" ? "AI suggestions" : "Suggested follow-ups · demo analysis"}</span>${agentResult.suggested_followups.map((f, i) => `<div class="suggestion"><small>${esc(state.projects.find((p) => p.id === f.project_id)?.name || "Project")} · ${esc(state.suppliers.find((s) => s.id === f.supplier_id)?.name || "Supplier")}</small><p>${esc(f.message)}</p><button data-review-suggestion="${i}">Review follow-up →</button></div>`).join("") || "<p>No overdue follow-ups to suggest.</p>"}` : "<p>Review saved stages, sample dates, and open actions. Suggestions stay here until you choose to review and save them.</p>"}</div><div class="agent-footnote">${agentResult?.mode === "live" ? "AI can make mistakes. Review each suggestion." : "Demo analysis uses saved dates and stages; a live AI model is not connected in the preview."} Nothing is sent to suppliers.</div>`;
+  panel.innerHTML = `<div class="agent-head"><div class="row"><div><h2>✧ Branch AI</h2><span class="agent-mode">${agentResult?.mode === "live" ? "Live AI · Project tracking" : "Demo insights · Project tracking"}</span></div><button id="close-agent" aria-label="Close tracking assistant">×</button></div><p>Keep projects moving, one follow-up at a time.</p><small class="agent-scope">${typeof agentScope === "string" ? esc(agentScope.slice("developer:".length)) + " · Developer projects" : agentScope === null ? "Projects · " + quarter : esc(state.projects.find((p) => p.id === agentScope)?.name || "Project")} · Saved project data</small><textarea id="agent-question" aria-label="Ask the tracking assistant" placeholder="Summarize status and flag overdue actions…"></textarea><div class="agent-question"><button class="primary" id="analyze-project" ${agentBusy ? "disabled" : ""}>${agentBusy ? "Reviewing…" : "Review project status"}</button></div></div><div class="agent-content" id="agent-content">${agentBusy ? '<p role="status">Reviewing saved project status and supplier actions…</p>' : agentResult ? `<p>${esc(agentResult.summary)}</p>${agentEvidence()}${agentResult.developer ? `<h3>Saved-data recommendations</h3>${(agentResult.recommendations || []).map((r) => `<div class="suggestion"><p>${esc(r.message)}</p><button data-project="${r.project_id}" class="quiet-link">Open project →</button></div>`).join("") || "<p>No active projects to recommend next steps for.</p>"}` : ""}<span class="eyebrow">${agentResult.mode === "live" ? "AI suggestions" : "Suggested follow-ups · demo analysis"}</span>${agentResult.suggested_followups.map((f, i) => `<div class="suggestion"><small>${esc(state.projects.find((p) => p.id === f.project_id)?.name || "Project")} · ${esc(state.suppliers.find((s) => s.id === f.supplier_id)?.name || "Supplier")}</small><p>${esc(f.message)}</p><button data-review-suggestion="${i}">Review follow-up →</button></div>`).join("") || "<p>No overdue follow-ups to suggest.</p>"}` : "<p>Review saved stages, sample dates, and open actions. Suggestions stay here until you choose to review and save them.</p>"}</div><div class="agent-footnote">${agentResult?.mode === "live" ? "AI can make mistakes. Review each suggestion." : "Demo analysis uses saved dates and stages; a live AI model is not connected in the preview."} Nothing is sent to suppliers.</div>`;
   $("#close-agent").onclick = () => {
     panel.hidden = true;
     $("#agent-toggle").focus();
@@ -2936,6 +2949,7 @@ async function runAgent() {
   try {
     const result = await api("/api/agent/analyze", {
       project_id: typeof scope === "string" ? null : scope,
+      ...(scope === null || typeof scope === "string" ? { quarter } : {}),
       ...(typeof scope === "string"
         ? { owner: scope.slice("developer:".length) }
         : {}),
@@ -3794,7 +3808,10 @@ function supplierActionList(s) {
       .map((p) => {
         const related = actions.filter((a) => a.project_id === p.id);
         const reserved = state.reservations.filter(
-          (r) => r.project_id === p.id && r.supplier_id === s.id,
+          (r) =>
+            r.project_id === p.id &&
+            r.supplier_id === s.id &&
+            r.quarter === quarter,
         );
         return `<article class="supplier-project" data-supplier-project="${p.id}"><div class="supplier-project-heading">${art(p)}<div><h3><button class="link" data-project="${p.id}">${esc(p.name)}</button></h3><small>${esc(p.category)} · ${esc(p.owner)}</small><div>${stagePill(p.supplier_details[String(s.id)].stage)}</div><small>Target launch ${esc(p.target_launch || "2027")}</small></div><button class="link" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>${reserved.map((r) => `<div class="supplier-project-reservation"><span class="pill good">Sample order · ${esc(r.quarter)}</span>${cancelButton(r)}</div>`).join("")}<div class="supplier-project-actions"><h4>Related actions (${related.length})</h4>${related.length ? actionListRows(related, false) : "<p>No supplier-related actions for this project yet.</p>"}</div></article>`;
       })
@@ -3850,13 +3867,13 @@ async function prepareProjectImage(file) {
   }
 }
 function developersPage() {
-  return `<div class="row"><div><h1>Product Developers</h1><p class="page-subtitle">Projects grouped by owner. Open any project to see its details.</p></div><span class="pill">${state.people.length} people · ${state.projects.length} projects</span></div><div class="developers-grid">${state.people
+  return `<div class="row"><div><h1>Product Developers</h1><p class="page-subtitle">Projects grouped by owner. Open any project to see its details.</p></div><span class="pill">${state.people.length} people · ${projectsInPeriod().length} projects</span>${capacityQuarterControl()}</div><div class="developers-grid">${state.people
     .map((name) => {
-      const projects = state.projects.filter((p) => p.owner === name),
+      const projects = projectsInPeriod().filter((p) => p.owner === name),
         active = projects.filter((p) => p.status !== "Complete"),
         open = projects.flatMap((p) => projectActions(p)),
         overdue = open.filter((a) => a.due_date < todayLocal());
-      return `<section class="card developer-card" data-developer="${esc(name)}"><div class="row"><h2><button class="link" data-open-developer="${esc(name)}">${esc(name)}</button></h2><span class="pill">${projects.length} ${projects.length === 1 ? "project" : "projects"}</span></div><button class="quiet-link" data-open-developer="${esc(name)}">View actions & recommendations →</button><p class="developer-summary">${active.length} active · ${projects.length - active.length} complete · ${open.length} open actions · ${overdue.length} overdue</p>${projects.map((p) => `<div class="developer-project">${art(p)}<div><button class="link" data-developer-project="${p.id}">${esc(p.name)}</button><small>${esc(p.category)} · Target launch ${esc(p.target_launch || "2027")}</small>${projectStage(p)}<small>Final Review ${milestoneDates(p).final_review ? dateLabel(milestoneDates(p).final_review) : "Not set"}</small></div><button data-developer-project="${p.id}" aria-label="Open ${esc(p.name)} details">›</button></div>`).join("") || "<p>No projects assigned yet.</p>"}</section>`;
+      return `<section class="card developer-card" data-developer="${esc(name)}"><div class="row"><h2><button class="link" data-open-developer="${esc(name)}">${esc(name)}</button></h2><span class="pill">${projects.length} ${projects.length === 1 ? "project" : "projects"}</span></div><button class="quiet-link" data-open-developer="${esc(name)}">View actions & recommendations →</button><p class="developer-summary">${active.length} active · ${projects.length - active.length} complete · ${open.length} open actions · ${overdue.length} overdue</p>${projects.map((p) => `<div class="developer-project">${art(p)}<div><button class="link" data-developer-project="${p.id}">${esc(p.name)}</button><small>${esc(p.category)} · Target launch ${esc(p.target_launch || "2027")}</small>${projectStage(p)}<small>Final Review ${milestoneDates(p).final_review ? dateLabel(milestoneDates(p).final_review) : "Not set"}</small></div><button data-developer-project="${p.id}" aria-label="Open ${esc(p.name)} details">›</button></div>`).join("") || "<p>No projects in this quarter.</p>"}</section>`;
     })
     .join(
       "",
@@ -3932,25 +3949,25 @@ function projectPeriodQuery() {
     projectQuarter: projectPeriod.quarter,
   }).toString();
 }
-function projectsInPeriod() {
-  if (page !== "projects" || !projectPeriod.year) return state.projects;
-  const year = Number(projectPeriod.year),
-    q = Number(projectPeriod.quarter),
-    start =
-      year + "-" + String(q ? (q - 1) * 3 + 1 : 1).padStart(2, "0") + "-01",
-    end = new Date(Date.UTC(year, q ? q * 3 : 12, 0))
-      .toISOString()
-      .slice(0, 10);
-  return state.projects.filter(
-    (p) => p.development_start <= end && p.development_end >= start,
+function projectInQuarter(p, selectedQuarter = quarter) {
+  const [year, part] = selectedQuarter.split("-Q"),
+    q = Number(part);
+  const start = `${year}-${String((q - 1) * 3 + 1).padStart(2, "0")}-01`;
+  const end = new Date(Date.UTC(Number(year), q * 3, 0))
+    .toISOString()
+    .slice(0, 10);
+  return (
+    (p.development_start <= end && p.development_end >= start) ||
+    state.reservations.some(
+      (r) => r.project_id === p.id && r.quarter === selectedQuarter,
+    )
   );
 }
+function projectsInPeriod() {
+  return state.projects.filter((p) => projectInQuarter(p));
+}
 function projectPeriodSummary(count) {
-  const label = projectPeriod.year
-    ? (projectPeriod.quarter ? "Q" + projectPeriod.quarter + " " : "") +
-      projectPeriod.year
-    : "all years and quarters";
-  return `<div class="row project-period-summary"><p id="project-period-summary" role="status">${count} projects · Development during ${esc(label)}</p>${projectPeriod.year ? '<button id="clear-project-period">Clear filters</button>' : ""}</div>`;
+  return `<p id="project-period-summary" role="status">${count} projects · ${esc(quarter)} · Development overlaps this quarter or a sample order is scheduled here.</p>`;
 }
 function filterProjects() {
   const dialog = $("#planning-dialog");
@@ -3991,8 +4008,12 @@ function filterProjects() {
 }
 
 function developerPage() {
-  const projects = state.projects.filter((p) => p.owner === developerName),
-    actions = trackedActions().filter((a) => a.owner === developerName),
+  const projects = projectsInPeriod().filter((p) => p.owner === developerName),
+    actions = trackedActions().filter(
+      (a) =>
+        a.owner === developerName &&
+        projects.some((p) => p.id === a.project_id),
+    ),
     today = todayLocal();
   const groups = [
     ["Overdue", actions.filter((a) => !a.completed && a.due_date < today)],
@@ -4000,7 +4021,7 @@ function developerPage() {
     ["Upcoming", actions.filter((a) => !a.completed && a.due_date > today)],
     ["Completed", actions.filter((a) => a.completed)],
   ];
-  return `<button class="back" data-go="developers">← Product Developers</button><div class="row"><div><h1>${esc(developerName)}</h1><p class="page-subtitle">${projects.length} projects · Action dates in Eastern time</p></div><button class="primary" data-agent>✧ Review with Branch AI</button></div><div class="stats actions-stats">${groups.map(([name, items]) => `<div class="card stat"><div><strong>${items.length}</strong><span class="stat-label">${name}</span></div></div>`).join("")}</div><div class="developer-detail-layout"><div>${groups.map(([name, items]) => `<section class="card section"><h2>${name} (${items.length})</h2>${actionListRows(items)}</section>`).join("")}</div><div><section class="card agent-card section"><h2>✧ Branch AI · ${esc(developerName)}</h2><p>Review this developer's saved projects, overdue actions and sample targets. Recommendations stay scoped to their projects.</p><button data-agent class="primary">Review developer priorities →</button><p class="agent-mode">Demo insights from saved data. No automatic changes or messages.</p></section><section class="card section"><h2>Projects</h2>${projectRows(projects) || "<p>No projects assigned yet.</p>"}</section></div></div><p class="dialog-info">Everyone can view these actions. Only each project's owner can update it.</p>`;
+  return `<button class="back" data-go="developers">← Product Developers</button><div class="row"><div><h1>${esc(developerName)}</h1><p class="page-subtitle">${projects.length} projects · Action dates in Eastern time</p></div><div class="page-heading-actions">${capacityQuarterControl()}<button class="primary" data-agent>✧ Review with Branch AI</button></div></div><div class="stats actions-stats">${groups.map(([name, items]) => `<div class="card stat"><div><strong>${items.length}</strong><span class="stat-label">${name}</span></div></div>`).join("")}</div><div class="developer-detail-layout"><div>${groups.map(([name, items]) => `<section class="card section"><h2>${name} (${items.length})</h2>${actionListRows(items)}</section>`).join("")}</div><div><section class="card agent-card section"><h2>✧ Branch AI · ${esc(developerName)}</h2><p>Review this developer's saved projects, overdue actions and sample targets. Recommendations stay scoped to their projects.</p><button data-agent class="primary">Review developer priorities →</button><p class="agent-mode">Demo insights from saved data. No automatic changes or messages.</p></section><section class="card section"><h2>Projects</h2>${projectRows(projects) || "<p>No projects in this quarter.</p>"}</section></div></div><p class="dialog-info">Everyone can view these actions. Only each project's owner can update it.</p>`;
 }
 
 function projectsNeedingAttention() {
@@ -4008,7 +4029,7 @@ function projectsNeedingAttention() {
     end = new Date(today + "T12:00:00Z");
   end.setUTCDate(end.getUTCDate() + 30);
   const horizon = end.toISOString().slice(0, 10);
-  return state.projects
+  return projectsInPeriod()
     .filter((p) => p.status !== "Complete")
     .map((p) => {
       const late = projectActions(p).filter(
@@ -4062,10 +4083,13 @@ function projectsNeedingAttention() {
 }
 
 function executiveOverview() {
-  const active = state.projects.filter((p) => p.status !== "Complete");
+  const active = projectsInPeriod().filter((p) => p.status !== "Complete");
   const sourcing = active.filter((p) => projectSupplierIds(p).length === 0);
   const overdue = trackedActions().filter(
-    (a) => !a.completed && a.due_date < todayLocal(),
+    (a) =>
+      active.some((p) => p.id === a.project_id) &&
+      !a.completed &&
+      a.due_date < todayLocal(),
   );
   const rows = state.capacity.filter((c) => c.quarter === quarter);
   const pressured = rows.filter((c) =>
@@ -4078,13 +4102,13 @@ function executiveOverview() {
   <section class="overview-tools card" aria-label="Workspace tools"><button class="primary" id="new-project">＋ New project</button><div><button id="overview-tutorial">▷ ${branchTutorialVideo ? "Watch the walkthrough" : "Tutorial · coming soon"}</button><button class="quiet-link" id="overview-guide">Loading guide</button></div></section>
   <figure class="overview-photo"><img src="${branchImages["workspace-hero"]}" alt="Sunlit home workspace with an adjustable desk and ergonomic chair" loading="eager"></figure>
   <div class="stats executive-stats">${[
-    [active.length, "Active projects", "Across the workspace"],
+    [active.length, "Active projects", "In the selected quarter"],
     [sourcing.length, "Seeking suppliers", "Ready to compare partners"],
     [overdue.length, "Overdue actions", "Follow-ups needing review"],
     [
-      state.reservations.length,
+      state.reservations.filter((r) => r.quarter === quarter).length,
       "Sample orders",
-      "Saved development commitments",
+      "In the selected quarter",
     ],
   ]
     .map(
@@ -4100,7 +4124,8 @@ function executiveOverview() {
         ({ project: p, reasons }) =>
           `<article>${art(p)}<h3><button class="link" data-project="${p.id}">${esc(p.name)}</button></h3><small>${esc(p.owner)}</small><ul class="attention-reasons">${reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></article>`,
       )
-      .join("") || "<p>No projects need attention under these checks.</p>"
+      .join("") ||
+    "<p>No projects in this quarter need attention under these checks.</p>"
   }</div></section>`;
 }
 function openTutorial() {
@@ -4358,7 +4383,7 @@ function parseMilestoneValues(body) {
 }
 
 function capacityQuarterControl(label = "Capacity quarter") {
-  return `<div class="capacity-quarter-control"><label for="quarter">Capacity quarter</label><select id="quarter" aria-label="${esc(label)}" title="Changes the development workload and sample orders shown">${state.quarters.map((q) => `<option value="${q}" ${q === quarter ? "selected" : ""}>${q.slice(5)} · ${q.slice(0, 4)}</option>`).join("")}</select></div>`;
+  return `<div class="capacity-quarter-control"><label for="quarter">Capacity quarter</label><select id="quarter" aria-label="${esc(label)}" title="Filters project lists, development workload and sample orders">${state.quarters.map((q) => `<option value="${q}" ${q === quarter ? "selected" : ""}>${q.slice(5)} · ${q.slice(0, 4)}</option>`).join("")}</select></div>`;
 }
 
 // Used only by the explicitly labeled standalone preview, never the hosted app.
@@ -4755,12 +4780,19 @@ api = async function previewApi(url, body, method = "POST") {
   if (url === "/api/agent/analyze") {
     if (body.owner != null && !previewData.people.includes(body.owner))
       previewFailure(422, "Choose a listed developer");
+    if (body.quarter != null && !previewData.quarters.includes(body.quarter))
+      previewFailure(422, "Choose a listed quarter");
     const projects = previewData.projects.filter(
       (p) =>
+        (body.quarter == null || projectInQuarter(p, body.quarter)) &&
         (body.project_id == null || p.id === body.project_id) &&
         (body.owner == null || p.owner === body.owner),
     );
-    if (!projects.length && (body.owner == null || body.project_id != null))
+    if (
+      !projects.length &&
+      body.quarter == null &&
+      (body.owner == null || body.project_id != null)
+    )
       previewFailure(404, "Project not found");
     const today = todayLocal();
     const actions = projects.flatMap((p) =>
@@ -4834,7 +4866,7 @@ api = async function previewApi(url, body, method = "POST") {
         .map(([stage, count]) => `${count} ${stage.toLowerCase()}`)
         .join(
           ", ",
-        )}), ${previewData.reservations.filter((r) => projects.some((p) => p.id === r.project_id)).length} sample orders, and ${overdue.length} overdue actions. ${overdue.length ? "Start with the oldest overdue action and agree a new date with the supplier." : "No overdue actions in this view. Review upcoming sample targets next."}`,
+        )}), ${previewData.reservations.filter((r) => projects.some((p) => p.id === r.project_id) && (body.quarter == null || r.quarter === body.quarter)).length} sample orders, and ${overdue.length} overdue actions. ${overdue.length ? "Start with the oldest overdue action and agree a new date with the supplier." : "No overdue actions in this view. Review upcoming sample targets next."}`,
       overdue_actions: overdue,
       suggested_followups: overdue
         .filter((a) => !a.action_id)
