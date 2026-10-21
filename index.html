@@ -2053,6 +2053,18 @@ td {
   }
 }
 
+.tutorial-audio-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.tutorial-audio-controls [role="status"] {
+  font-size: 13px;
+  color: var(--muted);
+}
+
   </style>
   <div class="shell">
     <aside>
@@ -4373,9 +4385,37 @@ function executiveOverview() {
 }
 function openTutorial() {
   const dialog = $("#planning-dialog");
-  dialog.innerHTML = `<div class="learning-dialog"><span class="eyebrow">Workspace tutorial</span><h2 id="dialog-title">From a new supplier to sample development</h2>${branchTutorialVideo ? `<video class="tutorial-video" poster="${branchImages["walkthrough-poster"] || ""}" controls playsinline preload="metadata" aria-label="Narrated workspace walkthrough with on-screen instructions"><source src="${branchTutorialVideo}" type="${branchTutorialType}"></video><p>Follow real clicks through a fictional workspace. British female narration with on-screen instructions.</p><h3>Jump to a chapter</h3><div class="tutorial-chapters" aria-label="Walkthrough chapters">${branchTutorialChapters.map((c) => `<button data-tutorial-time="${c.seconds}"><small>${Math.floor(c.seconds / 60)}:${String(Math.floor(c.seconds % 60)).padStart(2, "0")}</small> ${esc(c.title)}</button>`).join("")}</div><p><a download="Branch-workspace-walkthrough.${branchTutorialType === "video/mp4" ? "mp4" : "webm"}" href="${branchTutorialVideo}">Download video</a></p>` : "<p>The walkthrough is being prepared.</p>"}<div class="actions"><button class="primary" id="close-learning">Close</button></div></div>`;
+  dialog.innerHTML = `<div class="learning-dialog"><span class="eyebrow">Workspace tutorial</span><h2 id="dialog-title">Narrated workspace walkthrough</h2>${branchTutorialVideo ? `<video class="tutorial-video" poster="${branchImages["walkthrough-poster"] || ""}" controls playsinline preload="metadata" aria-label="Narrated workspace walkthrough with on-screen instructions"><source src="${branchTutorialVideo}" type="${branchTutorialType}"></video><div class="tutorial-audio-controls"><button class="primary" id="play-tutorial-sound">▶ Play with sound</button><span id="tutorial-sound-status" role="status">Ready with sound</span></div><p>Follow real clicks through a fictional workspace. British female narration with on-screen instructions.</p><h3>Jump to a chapter</h3><div class="tutorial-chapters" aria-label="Walkthrough chapters">${branchTutorialChapters.map((c) => `<button data-tutorial-time="${c.seconds}"><small>${Math.floor(c.seconds / 60)}:${String(Math.floor(c.seconds % 60)).padStart(2, "0")}</small> ${esc(c.title)}</button>`).join("")}</div><p><a download="Branch-Walkthrough-Narrated.${branchTutorialType === "video/mp4" ? "mp4" : "webm"}" href="${branchTutorialVideo}">Download video</a></p>` : "<p>The walkthrough is being prepared.</p>"}<div class="actions"><button class="primary" id="close-learning">Close</button></div></div>`;
   dialog.showModal();
   const video = dialog.querySelector("video");
+  const soundStatus = dialog.querySelector("#tutorial-sound-status");
+  const updateSoundStatus = () => {
+    if (soundStatus)
+      soundStatus.textContent =
+        video.muted || video.volume === 0
+          ? "Sound off · Select Play with sound"
+          : video.paused
+            ? "Ready with sound"
+            : "Sound on";
+  };
+  const playWithSound = () => {
+    video.muted = false;
+    video.defaultMuted = false;
+    video.volume = 1;
+    const playing = video.play();
+    if (playing)
+      playing.catch(() => {
+        soundStatus.textContent =
+          "Select the video's play control to start with sound.";
+      });
+  };
+  if (video) {
+    video.muted = false;
+    for (const event of ["volumechange", "play", "pause"])
+      video.addEventListener(event, updateSoundStatus);
+    $("#play-tutorial-sound").onclick = playWithSound;
+  }
+
   dialog.querySelectorAll("[data-tutorial-time]").forEach(
     (button) =>
       (button.onclick = async () => {
@@ -4385,7 +4425,7 @@ function openTutorial() {
           );
         video.currentTime = Number(button.dataset.tutorialTime);
         video.scrollIntoView({ block: "nearest" });
-        video.play().catch(() => {});
+        playWithSound();
       }),
   );
   $("#close-learning").onclick = () => dialog.close();
