@@ -1977,46 +1977,39 @@ td {
   }
 }
 .capacity-quarter-control {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: #203e34;
   color: #fff;
-  padding: 12px 16px;
-  border: 2px solid #8fae74;
-  border-radius: 9px;
-  min-width: 220px;
-  box-shadow: 0 2px 7px #203e3420;
+  padding: 9px 13px;
+  border: 1px solid #203b31;
+  border-radius: 5px;
+  white-space: nowrap;
 }
 .capacity-quarter-control label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #e7efde;
+  font: inherit;
+  color: inherit;
+  margin: 0;
 }
 .capacity-quarter-control select {
-  color: #fff;
-  background: #203e34;
-  border: 1px solid #8da58f;
-  font-size: 19px;
-  font-weight: 600;
-  padding: 8px 12px;
-  min-height: 44px;
-  width: 100%;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  padding: 0;
+  min-height: 0;
+  width: auto;
   cursor: pointer;
 }
 .capacity-quarter-control select option {
   background: #fff;
   color: #203e34;
 }
-.capacity-quarter-control select:focus-visible {
-  outline: 3px solid #d6e8b8;
+.capacity-quarter-control:focus-within {
+  outline: 3px solid #86a35d;
   outline-offset: 3px;
-}
-@media (max-width: 600px) {
-  .capacity-quarter-control {
-    min-width: 0;
-    width: 100%;
-  }
 }
 
 .attention-reasons {
