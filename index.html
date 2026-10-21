@@ -1839,18 +1839,18 @@ td {
   margin-top: 6px;
   color: var(--muted);
 }
-.overview-spotlight {
+.overview-attention {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
 }
-.overview-spotlight .product-art {
+.overview-attention .product-art {
   height: 155px;
 }
-.overview-spotlight h3 button {
+.overview-attention h3 button {
   text-align: left;
 }
-.overview-spotlight small {
+.overview-attention small {
   display: block;
   color: var(--muted);
   margin: 10px 0;
@@ -1884,7 +1884,7 @@ td {
     border-top: 1px solid #ccd5c5;
     padding: 20px 0 0;
   }
-  .overview-spotlight {
+  .overview-attention {
     grid-template-columns: minmax(0, 1fr);
   }
   .overview-focus {
@@ -2017,6 +2017,16 @@ td {
     min-width: 0;
     width: 100%;
   }
+}
+
+.attention-reasons {
+  padding-left: 18px;
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.attention-reasons li {
+  margin: 6px 0;
 }
 
   </style>
@@ -3993,6 +4003,64 @@ function developerPage() {
   return `<button class="back" data-go="developers">← Product Developers</button><div class="row"><div><h1>${esc(developerName)}</h1><p class="page-subtitle">${projects.length} projects · Action dates in Eastern time</p></div><button class="primary" data-agent>✧ Review with Branch AI</button></div><div class="stats actions-stats">${groups.map(([name, items]) => `<div class="card stat"><div><strong>${items.length}</strong><span class="stat-label">${name}</span></div></div>`).join("")}</div><div class="developer-detail-layout"><div>${groups.map(([name, items]) => `<section class="card section"><h2>${name} (${items.length})</h2>${actionListRows(items)}</section>`).join("")}</div><div><section class="card agent-card section"><h2>✧ Branch AI · ${esc(developerName)}</h2><p>Review this developer's saved projects, overdue actions and sample targets. Recommendations stay scoped to their projects.</p><button data-agent class="primary">Review developer priorities →</button><p class="agent-mode">Demo insights from saved data. No automatic changes or messages.</p></section><section class="card section"><h2>Projects</h2>${projectRows(projects) || "<p>No projects assigned yet.</p>"}</section></div></div><p class="dialog-info">Everyone can view these actions. Only each project's owner can update it.</p>`;
 }
 
+function projectsNeedingAttention() {
+  const today = todayLocal(),
+    end = new Date(today + "T12:00:00Z");
+  end.setUTCDate(end.getUTCDate() + 30);
+  const horizon = end.toISOString().slice(0, 10);
+  return state.projects
+    .filter((p) => p.status !== "Complete")
+    .map((p) => {
+      const late = projectActions(p).filter(
+        (a) => !a.completed && a.due_date < today,
+      );
+      const milestones = milestoneEntries(p)
+        .filter(([, due]) => due && due >= today && due <= horizon)
+        .sort((a, b) => a[1].localeCompare(b[1]));
+      const ordered = new Set(
+        state.reservations
+          .filter((r) => r.project_id === p.id && r.quarter === quarter)
+          .map((r) => r.supplier_id),
+      );
+      const capacity = state.capacity.filter(
+        (c) =>
+          c.quarter === quarter &&
+          ordered.has(c.supplier_id) &&
+          ["At limit", "Over limit"].includes(c.status),
+      );
+      const reasons = [];
+      if (late.length)
+        reasons.push(
+          `${late.length} overdue ${late.length === 1 ? "action" : "actions"}`,
+        );
+      for (const c of capacity)
+        reasons.push(
+          `${state.suppliers.find((s) => s.id === c.supplier_id)?.name || "Supplier"}: ${c.status.toLowerCase()} in ${quarter}`,
+        );
+      if (milestones.length)
+        reasons.push(
+          `${milestones[0][0]} ${milestones[0][1] === today ? "due today" : "due " + dateLabel(milestones[0][1])}`,
+        );
+      return {
+        project: p,
+        reasons,
+        rank: late.length ? 0 : capacity.length ? 1 : 2,
+        late: late.length,
+        nearest: late.length
+          ? late.map((a) => a.due_date).sort()[0]
+          : milestones[0]?.[1] || "9999-12-31",
+      };
+    })
+    .filter((p) => p.reasons.length)
+    .sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        b.late - a.late ||
+        a.nearest.localeCompare(b.nearest) ||
+        a.project.id - b.project.id,
+    );
+}
+
 function executiveOverview() {
   const active = state.projects.filter((p) => p.status !== "Complete");
   const sourcing = active.filter((p) => projectSupplierIds(p).length === 0);
@@ -4005,9 +4073,7 @@ function executiveOverview() {
   );
   const unknown = rows.filter((c) => c.project_limit == null);
   const missingTransit = state.suppliers.filter((s) => s.transit_weeks == null);
-  const spotlight = [...active]
-    .sort((a, b) => (b.id === 7) - (a.id === 7))
-    .slice(0, 3);
+  const attention = projectsNeedingAttention();
   return `<div class="row"><div><span class="eyebrow">Workspace at a glance</span><h1>Development overview</h1></div>${capacityQuarterControl("Capacity quarter")}</div>
   <section class="overview-tools card" aria-label="Workspace tools"><button class="primary" id="new-project">＋ New project</button><div><button id="overview-tutorial">▷ ${branchTutorialVideo ? "Watch the walkthrough" : "Tutorial · coming soon"}</button><button class="quiet-link" id="overview-guide">Loading guide</button></div></section>
   <figure class="overview-photo"><img src="${branchImages["workspace-hero"]}" alt="Sunlit home workspace with an adjustable desk and ergonomic chair" loading="eager"></figure>
@@ -4027,7 +4093,15 @@ function executiveOverview() {
     )
     .join("")}</div>
   <div class="overview-summary-grid"><section class="card"><span class="eyebrow">Executive summary</span><h2>Where to focus</h2><div class="overview-focus"><span class="pill ${overdue.length ? "warn" : "good"}">${overdue.length} overdue</span><div><h3>Overdue actions</h3><p>${overdue.length ? "Review overdue actions with project owners and agree the next step." : "No overdue actions. Review upcoming commitments to stay ahead."}</p><button class="quiet-link" data-go="actions">Review actions →</button></div></div><div class="overview-focus"><span class="pill ${pressured.length ? "warn" : "good"}">${pressured.length} at / over limit</span><div><h3>Supplier capacity</h3><p>${esc(quarter)}: ${pressured.length} suppliers at or over capacity; ${unknown.length} still need an assessment.</p><button class="quiet-link" data-go="workload">Review capacity →</button></div></div><div class="overview-focus"><span class="pill neutral">${missingTransit.length} unassessed</span><div><h3>Missing freight estimates</h3><p>${missingTransit.length} suppliers have no freight transit estimate. Confirm production and freight timing before committing to launch.</p><button class="quiet-link" data-go="suppliers">Review suppliers →</button></div></div></section><div>${agentCard(null)}</div></div>
-  <section class="card section"><div class="row"><div><span class="eyebrow">A few projects in focus</span><h2>Development spotlight</h2></div><button class="quiet-link" data-go="projects">View all projects →</button></div><div class="overview-spotlight">${spotlight.map((p) => `<article>${art(p)}<h3><button class="link" data-project="${p.id}">${esc(p.name)}</button></h3><small>${esc(p.owner)} · ${esc(p.category)}</small>${projectStage(p)}</article>`).join("") || "<p>No active projects yet. Start with New project.</p>"}</div></section>`;
+  <section class="card section"><div class="row"><h2>Projects needing attention</h2><button class="quiet-link" data-go="projects">View all projects →</button></div><p class="dialog-info">Overdue actions first, then capacity issues on sample orders in ${esc(quarter)}, then milestones within 30 days.${attention.length > 3 ? ` Showing 3 of ${attention.length} projects.` : ""}</p><div class="overview-attention">${
+    attention
+      .slice(0, 3)
+      .map(
+        ({ project: p, reasons }) =>
+          `<article>${art(p)}<h3><button class="link" data-project="${p.id}">${esc(p.name)}</button></h3><small>${esc(p.owner)}</small><ul class="attention-reasons">${reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></article>`,
+      )
+      .join("") || "<p>No projects need attention under these checks.</p>"
+  }</div></section>`;
 }
 function openTutorial() {
   const dialog = $("#planning-dialog");
