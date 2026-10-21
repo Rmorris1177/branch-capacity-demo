@@ -2196,15 +2196,28 @@ td {
       supplier = () => state.suppliers.find((s) => s.id === supplierId),
       reservations = (s) =>
         state.reservations.filter(
-          (r) => r.supplier_id === s.id && r.quarter === quarter,
+          (r) =>
+            r.supplier_id === s.id &&
+            (quarter === "all" || r.quarter === quarter),
         ),
       assessment = (s) =>
-        state.capacity.find(
-          (c) => c.supplier_id === s.id && c.quarter === quarter,
-        ),
+        quarter === "all"
+          ? {
+              project_limit: null,
+              scheduled: state.capacity
+                .filter((c) => c.supplier_id === s.id)
+                .reduce((n, c) => n + c.scheduled, 0),
+              background: state.capacity
+                .filter((c) => c.supplier_id === s.id)
+                .reduce((n, c) => n + c.background, 0),
+            }
+          : state.capacity.find(
+              (c) => c.supplier_id === s.id && c.quarter === quarter,
+            ),
       limit = (s) => assessment(s).project_limit,
       load = (s) => assessment(s).scheduled;
     function badge(s, extra = 0) {
+      if (quarter === "all") return `<span class="pill">By quarter</span>`;
       return limit(s) === null
         ? '<span class="pill">Not assessed</span>'
         : load(s) + extra > limit(s)
@@ -2214,6 +2227,15 @@ td {
             : '<span class="pill good">Within limit</span>';
     }
     function bar(s, extra = 0) {
+      if (quarter === "all")
+        return `<div class="table-wrap"><table aria-label="Quarterly capacity"><thead><tr><th>Quarter</th><th>Scheduled / limit</th></tr></thead><tbody>${state.capacity
+          .filter((c) => c.supplier_id === s.id)
+          .map(
+            (c) =>
+              `<tr><td>${esc(c.quarter)}</td><td>${c.scheduled} / ${c.project_limit ?? "Not assessed"}</td></tr>`,
+          )
+          .join("")}</tbody></table></div>`;
+
       return `<div class="bar ${limit(s) !== null && load(s) + extra > limit(s) ? "over" : ""}"><i style="width:${limit(s) === null ? 0 : Math.min(100, (100 * (load(s) + extra)) / Math.max(limit(s), 1))}%"></i></div>`;
     }
     function saveLocation() {
@@ -2248,9 +2270,13 @@ td {
       supplierId = state.suppliers.some((s) => s.id === +params.get("supplier"))
         ? +params.get("supplier")
         : state.suppliers[0]?.id;
-      quarter = state.quarters.includes(params.get("quarter"))
-        ? params.get("quarter")
-        : "2026-Q4";
+      quarter =
+        params.get("quarter") === "all" ||
+        state.quarters.includes(params.get("quarter"))
+          ? params.get("quarter")
+          : "2026-Q4";
+      if (["preview", "selection"].includes(page) && quarter === "all")
+        quarter = state.quarters[0];
       if (page === "supplier")
         supplierProjectQuarter = state.quarters.includes(
           params.get("supplierProjectQuarter"),
@@ -2268,6 +2294,8 @@ td {
       if (!state) return;
       if ($("#tracking-agent")) $("#tracking-agent").hidden = true;
       page = p;
+      if (["preview", "selection"].includes(page) && quarter === "all")
+        quarter = state.quarters[0];
       saveLocation();
       render();
       window.scrollTo(0, 0);
@@ -2324,7 +2352,7 @@ td {
           .join("")}</section></div>`;
       }
       if (page === "comparison") {
-        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Shortlist suppliers</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Choose potential partners, then confirm your shortlist to begin discussions. This does not place a sample order or use capacity.</p><div class="row"><span class="pill">${selected().shortlist.length} selected for shortlist</span>${shortlistConfirmationButton(selected())}</div>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample ordered</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div>${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
+        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Shortlist suppliers</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Choose potential partners, then confirm your shortlist to begin discussions. This does not place a sample order or use capacity.</p><div class="row"><span class="pill">${selected().shortlist.length} selected for shortlist</span>${shortlistConfirmationButton(selected())}</div>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample ordered</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${quarter === "all" ? "By quarter" : (limit(s) ?? "Not assessed")}</strong>${bar(s)}</div>${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
       }
       if (page === "preview" || page === "selection") {
         let s = supplier(),
@@ -2338,7 +2366,7 @@ td {
         html = `<div class="row"><div><div class="eyebrow">Shared planning / All projects</div><h1>One view. Everyone’s workload.</h1><p>Sample orders sit alongside illustrative background development work.</p></div>${capacityQuarterControl("Workload quarter")}</div><div class="compare">${state.suppliers
           .map(
             (s) =>
-              `<section class="card"><h2>${esc(s.name)}</h2><p>${esc(s.location)} · ${quarter}</p>${badge(s)}<div class="metric"><small>Scheduled / assessed limit</small><strong>${load(s)} / ${limit(s) ?? "Not assessed"}</strong>${bar(s)}</div><p>${assessment(s).background} illustrative background projects</p>${
+              `<section class="card"><h2>${esc(s.name)}</h2><p>${esc(s.location)} · ${quarter === "all" ? "All quarters" : quarter}</p>${badge(s)}<div class="metric"><small>Scheduled / assessed limit</small><strong>${load(s)} / ${quarter === "all" ? "By quarter" : (limit(s) ?? "Not assessed")}</strong>${bar(s)}</div><p>${assessment(s).background} illustrative background projects</p>${
                 reservations(s).length
                   ? reservations(s)
                       .map(
@@ -2964,7 +2992,9 @@ async function runAgent() {
   try {
     const result = await api("/api/agent/analyze", {
       project_id: typeof scope === "string" ? null : scope,
-      ...(scope === null || typeof scope === "string" ? { quarter } : {}),
+      ...(scope === null || typeof scope === "string"
+        ? { quarter: quarter === "all" ? null : quarter }
+        : {}),
       ...(typeof scope === "string"
         ? { owner: scope.slice("developer:".length) }
         : {}),
@@ -3340,7 +3370,15 @@ function newProject() {
     requestId = crypto.randomUUID();
   let projectImage = null,
     imageBusy = false;
-  const [year, q] = quarter.split("-Q").map(Number),
+  const [year, q] = (
+      quarter === "all"
+        ? todayLocal().slice(0, 4) +
+          "-Q" +
+          Math.ceil(Number(todayLocal().slice(5, 7)) / 3)
+        : quarter
+    )
+      .split("-Q")
+      .map(Number),
     quarterStart = `${year}-${String((q - 1) * 3 + 1).padStart(2, "0")}-01`;
   const end = new Date(Date.UTC(year, q * 3, 0)).toISOString().slice(0, 10),
     start =
@@ -3994,6 +4032,7 @@ function projectInQuarter(
   selectedQuarter = quarter,
   orders = state.reservations,
 ) {
+  if (selectedQuarter === "all") return true;
   const [year, part] = selectedQuarter.split("-Q"),
     q = Number(part);
   const start = `${year}-${String((q - 1) * 3 + 1).padStart(2, "0")}-01`;
@@ -4009,6 +4048,8 @@ function projectsInPeriod() {
   return state.projects.filter((p) => projectInQuarter(p));
 }
 function projectPeriodSummary(count) {
+  if (quarter === "all")
+    return `<p id="project-period-summary" role="status">${count} projects · All quarters</p>`;
   return `<p id="project-period-summary" role="status">${count} projects · ${esc(quarter)} · Development overlaps this quarter or a sample order is scheduled here.</p>`;
 }
 function filterProjects() {
@@ -4082,12 +4123,23 @@ function projectsNeedingAttention() {
         .sort((a, b) => a[1].localeCompare(b[1]));
       const ordered = new Set(
         state.reservations
-          .filter((r) => r.project_id === p.id && r.quarter === quarter)
+          .filter(
+            (r) =>
+              r.project_id === p.id &&
+              (quarter === "all" || r.quarter === quarter),
+          )
           .map((r) => r.supplier_id),
       );
       const capacity = state.capacity.filter(
         (c) =>
-          c.quarter === quarter &&
+          (quarter === "all"
+            ? state.reservations.some(
+                (r) =>
+                  r.project_id === p.id &&
+                  r.supplier_id === c.supplier_id &&
+                  r.quarter === c.quarter,
+              )
+            : c.quarter === quarter) &&
           ordered.has(c.supplier_id) &&
           ["At limit", "Over limit"].includes(c.status),
       );
@@ -4133,24 +4185,42 @@ function executiveOverview() {
       !a.completed &&
       a.due_date < todayLocal(),
   );
-  const rows = state.capacity.filter((c) => c.quarter === quarter);
-  const pressured = rows.filter((c) =>
-    ["At limit", "Over limit"].includes(c.status),
+  const rows = state.capacity.filter(
+    (c) => quarter === "all" || c.quarter === quarter,
   );
-  const unknown = rows.filter((c) => c.project_limit == null);
+  const pressured = [
+    ...new Map(
+      rows
+        .filter((c) => ["At limit", "Over limit"].includes(c.status))
+        .map((c) => [c.supplier_id, c]),
+    ).values(),
+  ];
+  const unknown = [
+    ...new Map(
+      rows
+        .filter((c) => c.project_limit == null)
+        .map((c) => [c.supplier_id, c]),
+    ).values(),
+  ];
   const missingTransit = state.suppliers.filter((s) => s.transit_weeks == null);
   const attention = projectsNeedingAttention();
   return `<div class="row"><div><span class="eyebrow">Workspace at a glance</span><h1>Development overview</h1></div>${capacityQuarterControl("Capacity quarter")}</div>
   <section class="overview-tools card" aria-label="Workspace tools"><button class="primary" id="new-project">＋ New project</button><div><button id="overview-tutorial">▷ ${branchTutorialVideo ? "Watch the walkthrough" : "Tutorial · coming soon"}</button><button class="quiet-link" id="overview-guide">Loading guide</button></div></section>
   <figure class="overview-photo"><img src="${branchImages["workspace-hero"]}" alt="Sunlit home workspace with an adjustable desk and ergonomic chair" loading="eager"></figure>
   <div class="stats executive-stats">${[
-    [active.length, "Active projects", "In the selected quarter"],
+    [
+      active.length,
+      "Active projects",
+      quarter === "all" ? "Across all quarters" : "In the selected quarter",
+    ],
     [sourcing.length, "Seeking suppliers", "Ready to compare partners"],
     [overdue.length, "Overdue actions", "Follow-ups needing review"],
     [
-      state.reservations.filter((r) => r.quarter === quarter).length,
+      state.reservations.filter(
+        (r) => quarter === "all" || r.quarter === quarter,
+      ).length,
       "Sample orders",
-      "In the selected quarter",
+      quarter === "all" ? "Across all quarters" : "In the selected quarter",
     ],
   ]
     .map(
@@ -4158,8 +4228,8 @@ function executiveOverview() {
         `<div class="card stat"><div><strong>${n}</strong><span class="stat-label">${label}</span><small>${note}</small></div></div>`,
     )
     .join("")}</div>
-  <div class="overview-summary-grid"><section class="card"><span class="eyebrow">Executive summary</span><h2>Where to focus</h2><div class="overview-focus"><span class="pill ${overdue.length ? "warn" : "good"}">${overdue.length} overdue</span><div><h3>Overdue actions</h3><p>${overdue.length ? "Review overdue actions with project owners and agree the next step." : "No overdue actions. Review upcoming commitments to stay ahead."}</p><button class="quiet-link" data-go="actions">Review actions →</button></div></div><div class="overview-focus"><span class="pill ${pressured.length ? "warn" : "good"}">${pressured.length} at / over limit</span><div><h3>Supplier capacity</h3><p>${esc(quarter)}: ${pressured.length} suppliers at or over capacity; ${unknown.length} still need an assessment.</p><button class="quiet-link" data-go="workload">Review capacity →</button></div></div><div class="overview-focus"><span class="pill neutral">${missingTransit.length} unassessed</span><div><h3>Missing freight estimates</h3><p>${missingTransit.length} suppliers have no freight transit estimate. Confirm production and freight timing before committing to launch.</p><button class="quiet-link" data-go="suppliers">Review suppliers →</button></div></div></section><div>${agentCard(null)}</div></div>
-  <section class="card section"><div class="row"><h2>Projects needing attention</h2><button class="quiet-link" data-go="projects">View all projects →</button></div><p class="dialog-info">Overdue actions first, then capacity issues on sample orders in ${esc(quarter)}, then milestones within 30 days.${attention.length > 3 ? ` Showing 3 of ${attention.length} projects.` : ""}</p><div class="overview-attention">${
+  <div class="overview-summary-grid"><section class="card"><span class="eyebrow">Executive summary</span><h2>Where to focus</h2><div class="overview-focus"><span class="pill ${overdue.length ? "warn" : "good"}">${overdue.length} overdue</span><div><h3>Overdue actions</h3><p>${overdue.length ? "Review overdue actions with project owners and agree the next step." : "No overdue actions. Review upcoming commitments to stay ahead."}</p><button class="quiet-link" data-go="actions">Review actions →</button></div></div><div class="overview-focus"><span class="pill ${pressured.length ? "warn" : "good"}">${pressured.length} at / over limit</span><div><h3>Supplier capacity</h3><p>${quarter === "all" ? "Across all quarters" : esc(quarter)}: ${pressured.length} suppliers at or over capacity; ${unknown.length} still need an assessment.</p><button class="quiet-link" data-go="workload">Review capacity →</button></div></div><div class="overview-focus"><span class="pill neutral">${missingTransit.length} unassessed</span><div><h3>Missing freight estimates</h3><p>${missingTransit.length} suppliers have no freight transit estimate. Confirm production and freight timing before committing to launch.</p><button class="quiet-link" data-go="suppliers">Review suppliers →</button></div></div></section><div>${agentCard(null)}</div></div>
+  <section class="card section"><div class="row"><h2>Projects needing attention</h2><button class="quiet-link" data-go="projects">View all projects →</button></div><p class="dialog-info">Overdue actions first, then capacity issues on sample orders in ${quarter === "all" ? "all quarters" : esc(quarter)}, then milestones within 30 days.${attention.length > 3 ? ` Showing 3 of ${attention.length} projects.` : ""}</p><div class="overview-attention">${
     attention
       .slice(0, 3)
       .map(
@@ -4425,7 +4495,7 @@ function parseMilestoneValues(body) {
 }
 
 function capacityQuarterControl(label = "Capacity quarter") {
-  return `<div class="capacity-quarter-control"><label for="quarter">Capacity quarter</label><select id="quarter" aria-label="${esc(label)}" title="Filters project lists, development workload and sample orders">${state.quarters.map((q) => `<option value="${q}" ${q === quarter ? "selected" : ""}>${q.slice(5)} · ${q.slice(0, 4)}</option>`).join("")}</select></div>`;
+  return `<div class="capacity-quarter-control"><label for="quarter">Capacity quarter</label><select id="quarter" aria-label="${esc(label)}" title="Filters project lists, development workload and sample orders">${["preview", "selection"].includes(page) ? "" : `<option value="all" ${quarter === "all" ? "selected" : ""}>Show all</option>`}${state.quarters.map((q) => `<option value="${q}" ${q === quarter ? "selected" : ""}>${q.slice(5)} · ${q.slice(0, 4)}</option>`).join("")}</select></div>`;
 }
 
 function shortlistIsConfirmed(p) {
@@ -4464,7 +4534,7 @@ async function confirmProjectShortlist(p, button) {
 
 // Used only by the explicitly labeled standalone preview, never the hosted app.
 const PREVIEW_STORAGE_KEY = "branch-fictional-preview-v1";
-const previewSeed = {"projects": [{"id": 1, "name": "Form task chair", "owner": "Jesse Menayan", "category": "Seating", "status": "Supplier review", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 2, "name": "Gather meeting table", "owner": "Verity Sylvester", "category": "Tables", "status": "Sampling", "description": "Develop a versatile tables collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 3, "name": "Nest lounge chair", "owner": "Mike Riggs", "category": "Seating", "status": "Development", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 4, "name": "Fold desk system", "owner": "Mia Peterson", "category": "Desks", "status": "Development", "description": "Develop a versatile desks collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 5, "name": "Cove privacy screen", "owner": "Chelsea Soochit", "category": "Accessories", "status": "Supplier review", "description": "Develop a versatile accessories collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 6, "name": "Line storage", "owner": "Ryan Morris", "category": "Storage", "status": "Planning", "description": "Develop a versatile storage collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 7, "name": "Compact standing-desk variant", "owner": "Mike Riggs", "category": "Home Office", "status": "Development", "description": "Develop a versatile home office collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"demo_key": "sourcing-arc-stool", "name": "Arc counter stool", "owner": "Jesse Menayan", "category": "Seating", "description": "A compact upholstered counter stool with a formed steel base. Compare upholstery, metalwork, MOQ, and sample lead times.", "id": 8, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-trail-table", "name": "Trail folding worktable", "owner": "Verity Sylvester", "category": "Tables", "description": "A flexible folding table with a durable wood top. Find partners for wood finishing, folding mechanisms, and pilot production.", "id": 9, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-haven-screen", "name": "Haven acoustic screen", "owner": "Mia Peterson", "category": "Accessories", "description": "A freestanding acoustic screen for shared workspaces. Compare textile construction, acoustic materials, and development capacity.", "id": 10, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}], "suppliers": [{"id": 1, "name": "Northstar Works", "location": "Vietnam", "specialty": "Seating \u00b7 upholstery", "lead": 6, "assessments": {"2026-Q4": 4, "2027-Q1": 3}, "background": {"2026-Q4": 2, "2027-Q1": 1}}, {"id": 2, "name": "Alder Manufacturing", "location": "Taiwan", "specialty": "Seating \u00b7 metalwork", "lead": 8, "assessments": {"2026-Q4": 3, "2027-Q1": 0}, "background": {"2026-Q4": 3}}, {"id": 3, "name": "Fieldwork Studio", "location": "Portugal", "specialty": "Wood \u00b7 upholstery", "lead": 7, "assessments": {}, "background": {"2026-Q4": 1}}], "people": ["Jesse Menayan", "Verity Sylvester", "Mike Riggs", "Mia Peterson", "Chelsea Soochit", "Ryan Morris"], "statuses": ["Planning", "Supplier review", "Development", "Sampling", "On hold", "Complete"], "quarters": ["2026-Q4", "2027-Q1", "2027-Q2", "2027-Q3"], "reservations": [], "capacity": [], "supplier_stages": ["Interest review", "Discussions", "Quoting", "Sample development", "Production planning", "Declined to bid"], "history": []};
+const previewSeed = {"projects": [{"id": 1, "name": "Form task chair", "owner": "Jesse Menayan", "category": "Seating", "status": "Supplier review", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 2, "name": "Gather meeting table", "owner": "Verity Sylvester", "category": "Tables", "status": "Sampling", "description": "Develop a versatile tables collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 3, "name": "Nest lounge chair", "owner": "Mike Riggs", "category": "Seating", "status": "Development", "description": "Develop a versatile seating collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 4, "name": "Fold desk system", "owner": "Mia Peterson", "category": "Desks", "status": "Development", "description": "Develop a versatile desks collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 5, "name": "Cove privacy screen", "owner": "Chelsea Soochit", "category": "Accessories", "status": "Supplier review", "description": "Develop a versatile accessories collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 6, "name": "Line storage", "owner": "Ryan Morris", "category": "Storage", "status": "Planning", "description": "Develop a versatile storage collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"id": 7, "name": "Compact standing-desk variant", "owner": "Mike Riggs", "category": "Home Office", "status": "Development", "description": "Develop a versatile home office collection for flexible, welcoming workspaces.", "development_start": "2026-10-01", "development_end": "2026-12-31", "sample_due": "2026-12-15", "shortlist": [], "version": 1, "supplier_details": {"1": {"stage": "Quoting", "next_action": "Review tooling estimate", "due_date": "2026-10-12", "completed": false, "updated_on": "2026-10-10"}, "2": {"stage": "Discussions", "next_action": "Confirm construction", "due_date": "2026-10-18", "completed": false, "updated_on": "2026-10-10"}, "3": {"stage": "Sample development", "next_action": "Approve sample specification", "due_date": "2026-10-25", "completed": false, "updated_on": "2026-10-10"}}, "target_launch": "2027"}, {"demo_key": "sourcing-arc-stool", "name": "Arc counter stool", "owner": "Jesse Menayan", "category": "Seating", "description": "A compact upholstered counter stool with a formed steel base. Compare upholstery, metalwork, MOQ, and sample lead times.", "id": 8, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-trail-table", "name": "Trail folding worktable", "owner": "Verity Sylvester", "category": "Tables", "description": "A flexible folding table with a durable wood top. Find partners for wood finishing, folding mechanisms, and pilot production.", "id": 9, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}, {"demo_key": "sourcing-haven-screen", "name": "Haven acoustic screen", "owner": "Mia Peterson", "category": "Accessories", "description": "A freestanding acoustic screen for shared workspaces. Compare textile construction, acoustic materials, and development capacity.", "id": 10, "status": "Supplier review", "target_launch": "2027", "development_start": "2027-01-04", "development_end": "2027-06-30", "sample_due": "2027-03-15", "supplier_ids": [], "shortlist": [], "supplier_details": {}, "version": 1}], "suppliers": [{"id": 1, "name": "Northstar Works", "location": "Vietnam", "specialty": "Seating \u00b7 upholstery", "lead": 6, "assessments": {"2026-Q4": 4, "2027-Q1": 3}, "background": {"2026-Q4": 2, "2027-Q1": 1}}, {"id": 2, "name": "Alder Manufacturing", "location": "Taiwan", "specialty": "Seating \u00b7 metalwork", "lead": 8, "assessments": {"2026-Q4": 3, "2027-Q1": 0}, "background": {"2026-Q4": 3}}, {"id": 3, "name": "Fieldwork Studio", "location": "Portugal", "specialty": "Wood \u00b7 upholstery", "lead": 7, "assessments": {}, "background": {"2026-Q4": 1}}], "people": ["Jesse Menayan", "Verity Sylvester", "Mike Riggs", "Mia Peterson", "Chelsea Soochit", "Ryan Morris"], "statuses": ["Planning", "Supplier review", "Development", "Sampling", "On hold", "Complete"], "quarters": ["2026-Q4", "2027-Q1", "2027-Q2", "2027-Q3", "2027-Q4", "2028-Q1", "2028-Q2", "2028-Q3", "2028-Q4", "2029-Q1", "2029-Q2", "2029-Q3", "2029-Q4", "2030-Q1", "2030-Q2", "2030-Q3", "2030-Q4"], "reservations": [], "capacity": [], "supplier_stages": ["Interest review", "Discussions", "Quoting", "Sample development", "Production planning", "Declined to bid"], "history": []};
 let previewData;
 let previewWriteSnapshot;
 try {
@@ -4479,6 +4549,9 @@ try {
   previewData = structuredClone(previewSeed);
 }
 function hydratePreview() {
+  previewData.quarters = [
+    ...new Set([...previewSeed.quarters, ...(previewData.quarters || [])]),
+  ].sort();
   previewData.history ||= [];
   previewData.creation_requests ||= {};
   previewData.supplier_requests ||= {};
