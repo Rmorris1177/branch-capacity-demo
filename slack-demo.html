@@ -2339,7 +2339,7 @@ td {
       window.scrollTo(0, 0);
     }
     function steps() {
-      return `<div class="steps">${["project", "comparison", "discussions", "selection", "workload"].map((p, i) => `<span class="${page === p ? "current" : ""}">${i + 1}. ${["Project brief", "Shortlist suppliers", "Discussions", "Sample order (optional)", "Supplier workload"][i]}</span>`).join("<span>→</span>")}</div>`;
+      return `<div class="steps">${["project", "comparison", "discussions", "selection", "workload"].map((p, i) => `<span class="${page === p ? "current" : ""}">${i + 1}. ${["Project brief", "Shortlist suppliers", "Discussions", "Lock in capacity (optional)", "Supplier workload"][i]}</span>`).join("<span>→</span>")}</div>`;
     }
     function projectTable() {
       return `<div class="table-wrap"><table><thead><tr><th>Project / category</th><th>Owner</th><th>Stage</th><th></th></tr></thead><tbody>${state.projects.map((p) => `<tr><td><button class="link" data-project="${p.id}">${esc(p.name)}</button><br><small style="color:var(--muted)">${esc(p.category)}</small></td><td>${esc(p.owner)}</td><td><span class="pill">${esc(p.status)}</span></td><td><button data-project="${p.id}" aria-label="Open ${esc(p.name)}">→</button></td></tr>`).join("")}</tbody></table></div>`;
@@ -2390,7 +2390,7 @@ td {
           .join("")}</section></div>`;
       }
       if (page === "comparison") {
-        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Shortlist suppliers</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Choose potential partners, then confirm your shortlist to begin discussions. This does not place a sample order or use capacity.</p><div class="row"><span class="pill">${pendingShortlistIds(selected()).length} new candidates selected</span>${shortlistConfirmationButton(selected())}</div>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${supplierDiscussionConfirmed(selected(), s.id) ? (selected().shortlist.includes(s.id) ? "Confirmed · Comparing" : "Confirmed · Compare") : selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${badge(s)} ${reservations(s).some((r) => r.project_id === projectId) ? '<span class="pill good">Sample ordered</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div><div class="metric"><small>${quarter} development workload</small><strong>${load(s)} / ${quarter === "all" ? "By quarter" : (limit(s) ?? "Not assessed")}</strong>${bar(s)}</div>${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div><button data-supplier="${s.id}">Preview capacity →</button></section>`).join("")}</div>`;
+        html = `<button class="back" data-go="project">← Project brief</button><div class="eyebrow">${esc(selected().name)}</div><div class="row"><h1>Shortlist suppliers</h1><button class="primary" id="new-supplier">＋ New supplier</button></div><p>Choose potential partners, then confirm your shortlist to begin discussions. Shortlisting does not use capacity. Use Lock in capacity when you are ready to count this project against a supplier.</p><div class="row"><span class="pill">${pendingShortlistIds(selected()).length} new candidates selected</span>${shortlistConfirmationButton(selected())}</div>${steps()}<div class="compare">${state.suppliers.map((s) => `<section class="card"><div class="eyebrow">${esc(s.location)}</div><h2>${esc(s.name)}</h2><p>${esc(s.specialty)}</p><button data-shortlist="${s.id}" aria-pressed="${selected().shortlist.includes(s.id)}">${supplierDiscussionConfirmed(selected(), s.id) ? (selected().shortlist.includes(s.id) ? "Confirmed · Comparing" : "Confirmed · Compare") : selected().shortlist.includes(s.id) ? "✓ Shortlisted" : "Add to shortlist"}</button> ${state.reservations.some((r) => r.project_id === projectId && r.supplier_id === s.id) ? '<span class="pill good">Capacity locked</span>' : ""}<div class="metric"><small>Illustrative sample lead time</small><strong>${s.lead} weeks</strong></div>${launchWindowTable(selected(), s)}${supplierFreight(s)}<div class="metric"><small>Sample route</small><strong>Prototype & material review</strong></div>${state.reservations.some((r) => r.project_id === projectId && r.supplier_id === s.id) ? '<button disabled>Capacity locked ✓</button>' : `<button class="primary" data-lock="${s.id}" ${canEditProject(selected()) ? "" : "disabled"}>Lock in capacity</button>`}</section>`).join("")}</div>`;
       }
       if (page === "preview" || page === "selection") {
         let s = supplier(),
@@ -2497,7 +2497,7 @@ td {
     function editBrief() {
       const project = selected(),
         dialog = $("#planning-dialog");
-      dialog.innerHTML = `<form id="brief-form"><div class="row"><h2 id="dialog-title">Edit project brief</h2><span class="pill">BR-${String(project.id).padStart(3, "0")}</span></div><p>Save planning details for this project. Existing sample orders keep their chosen quarters.</p><div class="form-field"><label for="brief-name">Project name</label><input id="brief-name" name="name" maxlength="120" required value="${esc(project.name)}"></div><div class="split"><div class="form-field"><label for="brief-owner">Project owner</label><select id="brief-owner" name="owner">${state.people.map((n) => `<option ${n === project.owner ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div><div class="form-field"><label for="brief-status">Stage</label><select id="brief-status" name="status">${state.statuses.map((n) => `<option ${n === project.status ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div></div><div class="form-field"><label for="brief-category">Category</label><input id="brief-category" name="category" maxlength="80" required value="${esc(project.category)}"></div>${briefImageFields(project)}${commercialFields(project, "brief")}<div class="form-field"><label for="brief-description">Project description</label><textarea id="brief-description" name="description" maxlength="4000">${esc(project.description)}</textarea></div><div class="split"><div class="form-field"><label for="brief-development_start">Development start</label><input id="brief-development_start" name="development_start" type="date" min="2026-01-01" max="2035-12-31" required value="${esc(project.development_start)}"></div><div class="form-field"><label for="brief-development_end">Development completion</label><input id="brief-development_end" name="development_end" type="date" min="2026-01-01" max="2035-12-31" required value="${esc(project.development_end)}"></div></div>${milestoneFields(project, "brief")}<p id="dialog-error" role="alert"></p><button type="button" id="reload-brief" hidden>Load latest brief (discard edits)</button><div class="actions"><button type="button" id="close-dialog">Cancel</button><button class="primary" id="save-brief">Save brief</button></div></form>`;
+      dialog.innerHTML = `<form id="brief-form"><div class="row"><h2 id="dialog-title">Edit project brief</h2><span class="pill">BR-${String(project.id).padStart(3, "0")}</span></div><p>Save planning details for this project. Existing sample orders keep their chosen quarters.</p><div class="form-field"><label for="brief-name">Project name</label><input id="brief-name" name="name" maxlength="120" required value="${esc(project.name)}"></div><div class="split"><div class="form-field"><label for="brief-owner">Project owner</label><select id="brief-owner" name="owner">${state.people.map((n) => `<option ${n === project.owner ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div><div class="form-field"><label for="brief-status">Stage</label><select id="brief-status" name="status">${state.statuses.map((n) => `<option ${n === project.status ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div></div><div class="form-field"><label for="brief-category">Category</label><input id="brief-category" name="category" maxlength="80" required value="${esc(project.category)}"></div>${briefImageFields(project)}${commercialFields(project, "brief")}<div class="form-field"><label for="brief-launch-q">Target launch</label><div class="row"><select id="brief-launch-q" name="target_launch_quarter">${[1, 2, 3, 4].map((q) => `<option value="${q}" ${Number(project.target_launch_quarter) === q ? "selected" : ""}>Q${q}</option>`).join("")}</select><input id="brief-launch-y" name="target_launch" type="number" min="2026" max="2035" step="1" required value="${esc(project.target_launch || "2027")}" aria-label="Target launch year"></div></div><div class="form-field"><label for="brief-description">Project description</label><textarea id="brief-description" name="description" maxlength="4000">${esc(project.description)}</textarea></div><div class="split"><div class="form-field"><label for="brief-development_start">Development start</label><input id="brief-development_start" name="development_start" type="date" min="2026-01-01" max="2035-12-31" required value="${esc(project.development_start)}"></div><div class="form-field"><label for="brief-development_end">Development completion</label><input id="brief-development_end" name="development_end" type="date" min="2026-01-01" max="2035-12-31" required value="${esc(project.development_end)}"></div></div>${milestoneFields(project, "brief")}<p id="dialog-error" role="alert"></p><button type="button" id="reload-brief" hidden>Load latest brief (discard edits)</button><div class="actions"><button type="button" id="close-dialog">Cancel</button><button class="primary" id="save-brief">Save brief</button></div></form>`;
       const imageEdit = bindBriefImage(project);
       if (!dialog.open) dialog.showModal();
       $("#close-dialog").onclick = () => dialog.close();
@@ -2864,7 +2864,7 @@ function projectRows(projects) {
   return projects
     .map(
       (p) =>
-        `<div class="project-row">${art(p)}<div><button class="link project-name" data-project="${p.id}">${esc(p.name)}</button><small>${esc(p.category)} · Target launch ${esc(p.target_launch || "2027")}</small></div>${projectStage(p)}<button class="arrow" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>`,
+        `<div class="project-row">${art(p)}<div><button class="link project-name" data-project="${p.id}">${esc(p.name)}</button><small>${esc(p.category)} · Target launch ${launchLabel(p)}</small></div>${projectStage(p)}<button class="arrow" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>`,
     )
     .join("");
 }
@@ -2890,7 +2890,7 @@ function supplierTable(p) {
             r.supplier_id === s.id &&
             (!supplierProjectQuarter || r.quarter === supplierProjectQuarter),
         );
-      return `<tr><td><button class="link" data-profile="${s.id}">${esc(s.name)}</button>${supplierDiscussionConfirmed(p, s.id) ? "<small>Confirmed shortlist</small>" : supplierDiscussionClosed(p, s.id) ? "" : "<small>Candidate</small>"}</td><td>${stagePill(d.stage)}${["Declined to bid", "No longer pursuing"].includes(d.stage) ? `<small>Reason: ${esc(d.decline_reason)}</small>` : ""} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${esc(s.name)}">Edit</button><button class="tiny" data-remove-supplier="${p.id}:${s.id}" ${canManageSupplier(p) ? "" : "disabled"}>Remove</button></td></tr>`;
+      return `<tr><td><button class="link" data-profile="${s.id}">${esc(s.name)}</button>${supplierDiscussionConfirmed(p, s.id) ? "<small>Confirmed shortlist</small>" : supplierDiscussionClosed(p, s.id) ? "" : "<small>Candidate</small>"}</td><td>${stagePill(d.stage)}${["Declined to bid", "No longer pursuing"].includes(d.stage) ? `<small>Reason: ${esc(d.decline_reason)}</small>` : ""} ${reserved ? '<span class="pill selected-outline">Selected</span>' : ""}</td><td><button class="link" data-track="${p.id}:${s.id}">${esc(d.next_action || "Set next action")}</button>${d.completed ? "<small>Completed</small>" : ""}</td><td>${dateLabel(d.updated_on)}</td><td><button class="tiny" data-track="${p.id}:${s.id}" aria-label="Update ${esc(s.name)}">Edit</button>${state.reservations.some((r) => r.project_id === p.id && r.supplier_id === s.id) ? '<span class="pill good">Capacity locked</span>' : ["Declined to bid", "No longer pursuing"].includes(d.stage) ? "" : `<button class="tiny" data-lock="${s.id}" ${canEditProject(p) ? "" : "disabled"}>Lock in capacity</button>`}<button class="tiny" data-remove-supplier="${p.id}:${s.id}" ${canManageSupplier(p) ? "" : "disabled"}>Remove</button></td></tr>`;
     })
     .join(
       "",
@@ -2944,7 +2944,7 @@ function designPage() {
           .join("") ||
         "<p>No changes recorded yet. Saved project and supplier updates appear here.</p>"
       }</section>`;
-    return `<div class="project-hero">${art(p, true)}<div class="project-heading"><div class="hero-status"><span class="eyebrow">DEMO · Initial concept</span>${projectStage(p)}</div><h1>${esc(p.name)}</h1><div class="project-metadata"><div><small>Owner</small><strong>${esc(p.owner)}</strong></div><div><small>Product area</small><strong>${esc(p.category)}</strong></div><div><small>Target launch</small><strong>${esc(p.target_launch || "2027")}</strong></div></div><p>${esc(p.description)}</p>${commercialSummary(p)}<button id="edit-project" style="margin-top:15px;font-size:11px">Edit brief</button></div></div><div class="project-tabs" role="tablist" aria-label="Project sections">${["overview", "suppliers", "actions", "schedule", "history"].map((t) => `<button role="tab" data-tab="${t}" class="${projectTab === t ? "active" : ""}" aria-selected="${projectTab === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div><div class="project-content"><div>${content}</div><div><section class="card"><div class="row"><h2>Next actions (${projectActions(p).length})</h2><button data-new-action="${p.id}">＋ New action</button><button class="quiet-link" data-open-actions="${p.id}">View all</button></div>${nextActions(p)}</section>${agentCard(p)}</div></div>`;
+    return `<div class="project-hero">${art(p, true)}<div class="project-heading"><div class="hero-status"><span class="eyebrow">DEMO · Initial concept</span>${projectStage(p)}</div><h1>${esc(p.name)}</h1><div class="project-metadata"><div><small>Owner</small><strong>${esc(p.owner)}</strong></div><div><small>Product area</small><strong>${esc(p.category)}</strong></div><div><small>Target launch</small><strong>${launchLabel(p)}</strong></div></div><p>${esc(p.description)}</p>${commercialSummary(p)}<button id="edit-project" style="margin-top:15px;font-size:11px">Edit brief</button></div></div><div class="project-tabs" role="tablist" aria-label="Project sections">${["overview", "suppliers", "actions", "schedule", "history"].map((t) => `<button role="tab" data-tab="${t}" class="${projectTab === t ? "active" : ""}" aria-selected="${projectTab === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div><div class="project-content"><div>${content}</div><div><section class="card"><div class="row"><h2>Next actions (${projectActions(p).length})</h2><button data-new-action="${p.id}">＋ New action</button><button class="quiet-link" data-open-actions="${p.id}">View all</button></div>${nextActions(p)}</section>${agentCard(p)}</div></div>`;
   }
   if (page === "suppliers")
     return `<div class="row"><h1>Supplier partners</h1><div class="page-heading-actions">${capacityQuarterControl()}<span class="pill">${state.suppliers.length} development partners</span><button class="primary" id="new-supplier">＋ New supplier</button></div></div><div class="row"><label for="supplier-capability-filter">Filter capabilities</label><select id="supplier-capability-filter">${[
@@ -3533,7 +3533,7 @@ function newProject() {
         : quarterStart;
   const sample = new Date(end + "T12:00:00Z");
   sample.setUTCDate(sample.getUTCDate() - 14);
-  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief and potential suppliers. Confirm a shortlist to begin discussions. This does not place a sample order or use capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><label for="new-image">Project image (optional)</label><input id="new-image" type="file" accept="image/jpeg,image/png,image/webp"><p class="image-help">Choose a JPG, PNG, or WebP up to 10 MB. Images are resized for the demo.</p><div id="new-image-preview" hidden><img alt="Selected project image preview"><button type="button" id="remove-new-image">Remove image</button></div><p id="image-status" role="status"></p><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner"><option>${esc(currentDemoActor())}</option></select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div></div>${commercialFields({}, "new")}<label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2035-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2035-12-31" value="${end}"></div></div>${milestoneFields({ sample_due: sample.toISOString().slice(0, 10) }, "new")}<fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${esc(s.name)} <small>· ${esc(s.specialty)}</small></label>`).join("")}<small>Potential suppliers only. You will confirm the shortlist for discussions after creating the project.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
+  dialog.innerHTML = `<form id="new-project-form"><h2 id="dialog-title">New project</h2><p>Start with a brief and potential suppliers. Confirm a shortlist to begin discussions. This does not place a sample order or use capacity.</p><label for="new-name">Project name</label><input id="new-name" name="name" required maxlength="120" placeholder="e.g. Compact desk collection"><label for="new-image">Project image (optional)</label><input id="new-image" type="file" accept="image/jpeg,image/png,image/webp"><p class="image-help">Choose a JPG, PNG, or WebP up to 10 MB. Images are resized for the demo.</p><div id="new-image-preview" hidden><img alt="Selected project image preview"><button type="button" id="remove-new-image">Remove image</button></div><p id="image-status" role="status"></p><div class="split"><div><label for="new-owner">Project owner</label><select id="new-owner" name="owner"><option>${esc(currentDemoActor())}</option></select></div><div><label for="new-category">Product area</label><input id="new-category" name="category" required maxlength="80" placeholder="e.g. Home Office"></div></div><div class="split"><div><label for="new-stage">Stage</label><select id="new-stage" name="status">${state.statuses.map((s) => `<option ${s === "Planning" ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div><div><label for="new-launch">Target launch year</label><input id="new-launch" name="target_launch" type="number" required min="2026" max="2035" step="1" value="${Math.max(2027, year)}"></div><div><label for="new-launch-q">Target launch quarter</label><select id="new-launch-q" name="target_launch_quarter">${[1, 2, 3, 4].map((q) => `<option value="${q}">Q${q}</option>`).join("")}</select></div></div>${commercialFields({}, "new")}<label for="new-description">Project description</label><textarea id="new-description" name="description" maxlength="4000" placeholder="What are we developing?"></textarea><div class="split"><div><label for="new-start">Development start</label><input id="new-start" name="development_start" type="date" required min="2026-01-01" max="2035-12-31" value="${start}"></div><div><label for="new-end">Development completion</label><input id="new-end" name="development_end" type="date" required min="2026-01-01" max="2035-12-31" value="${end}"></div></div>${milestoneFields({ sample_due: sample.toISOString().slice(0, 10) }, "new")}<fieldset class="supplier-picks"><legend>Supplier candidates (optional)</legend>${state.suppliers.map((s) => `<label><input type="checkbox" name="supplier_ids" value="${s.id}"> ${esc(s.name)} <small>· ${esc(s.specialty)}</small></label>`).join("")}<small>Potential suppliers only. You will confirm the shortlist for discussions after creating the project.</small></fieldset><p id="dialog-error" role="alert"></p><div class="actions"><button type="button" id="cancel-new-project">Cancel</button><button class="primary" id="create-project">Create project</button></div></form>`;
   dialog.showModal();
   $("#cancel-new-project").onclick = () => dialog.close();
   let imageRequest = 0;
@@ -3608,6 +3608,7 @@ function newProject() {
     body.target_cost = body.target_cost === "" ? null : body.target_cost;
     body.request_id = requestId;
     body.target_launch = Number(body.target_launch);
+    body.target_launch_quarter = Math.min(4, Math.max(1, Number(body.target_launch_quarter) || 1));
     body.supplier_ids = form.getAll("supplier_ids").map(Number);
     $("#create-project").disabled = true;
     try {
@@ -3784,6 +3785,38 @@ function currentDemoActor() {
 }
 function canManageSupplier(p) {
   return canEditProject(p) || currentDemoActor() === "Ryan Morris";
+}
+// Target launch quarter helpers (Slack demo copy only).
+function defaultLaunchQuarter(p) {
+  const y = Number(String(p.development_end).slice(0, 4)), m = Number(String(p.development_end).slice(5, 7));
+  let q = Math.ceil(m / 3) + 1, yr = y;
+  if (q > 4) { q = 1; yr += 1; }
+  const target = Number(p.target_launch) || yr;
+  return target > yr ? 1 : target < yr ? 4 : q;
+}
+function launchLabel(p) {
+  return "Q" + (Number(p.target_launch_quarter) || defaultLaunchQuarter(p)) + " " + (p.target_launch || "2027");
+}
+function launchQuarters(p) {
+  const index = Number(p.target_launch || 2027) * 4 + ((Number(p.target_launch_quarter) || defaultLaunchQuarter(p)) - 1);
+  const key = (i) => Math.floor(i / 4) + "-Q" + ((i % 4) + 1);
+  return [key(index - 1), key(index), key(index + 1)];
+}
+function quarterLabel(k) {
+  const [y, q] = String(k).split("-");
+  return q + " " + y;
+}
+function launchWindowTable(p, s) {
+  const keys = launchQuarters(p);
+  const rows = keys.map((k, i) => {
+    const c = state.capacity.find((x) => x.supplier_id === s.id && x.quarter === k);
+    const lim = c ? c.project_limit : null;
+    const none = c && lim === 0 && c.status === "At limit";
+    const status = !c ? "Not tracked" : none ? "No capacity" : c.status;
+    const tone = !c || c.status === "Not assessed" ? "" : c.status === "Within limit" ? "good" : "warn";
+    return `<tr><td style="white-space:nowrap">${quarterLabel(k)}${i === 1 ? " <small>(launch)</small>" : ""}</td><td>${c ? c.scheduled : 0} / ${lim ?? "Not assessed"}</td><td><span class="pill ${tone}">${status}</span></td></tr>`;
+  }).join("");
+  return `<div class="metric"><small>Capacity around target launch (${quarterLabel(keys[1])})</small></div><div class="table-wrap"><table aria-label="${esc(s.name)} capacity around launch"><thead><tr><th>Quarter</th><th>Scheduled / limit</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function canEditProject(p) {
   return p?.owner === currentDemoActor();
@@ -4037,7 +4070,7 @@ function supplierActionList(s) {
             r.supplier_id === s.id &&
             (!supplierProjectQuarter || r.quarter === supplierProjectQuarter),
         );
-        return `<article class="supplier-project" data-supplier-project="${p.id}"><div class="supplier-project-heading">${art(p)}<div><h3><button class="link" data-project="${p.id}">${esc(p.name)}</button></h3><small>${esc(p.category)} · ${esc(p.owner)}</small><div>${stagePill(p.supplier_details[String(s.id)].stage)}</div><small>Target launch ${esc(p.target_launch || "2027")}</small></div><button class="link" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>${reserved.map((r) => `<div class="supplier-project-reservation"><span class="pill good">Sample order · ${esc(r.quarter)}</span>${cancelButton(r)}</div>`).join("")}<div class="supplier-project-actions"><h4>Related actions (${related.length})</h4>${related.length ? actionListRows(related, false) : "<p>No supplier-related actions for this project yet.</p>"}</div></article>`;
+        return `<article class="supplier-project" data-supplier-project="${p.id}"><div class="supplier-project-heading">${art(p)}<div><h3><button class="link" data-project="${p.id}">${esc(p.name)}</button></h3><small>${esc(p.category)} · ${esc(p.owner)}</small><div>${stagePill(p.supplier_details[String(s.id)].stage)}</div><small>Target launch ${launchLabel(p)}</small></div><button class="link" data-project="${p.id}" aria-label="Open ${esc(p.name)}">›</button></div>${reserved.map((r) => `<div class="supplier-project-reservation"><span class="pill good">Sample order · ${esc(r.quarter)}</span>${cancelButton(r)}</div>`).join("")}<div class="supplier-project-actions"><h4>Related actions (${related.length})</h4>${related.length ? actionListRows(related, false) : "<p>No supplier-related actions for this project yet.</p>"}</div></article>`;
       })
       .join("") ||
     (supplierProjectQuarter
@@ -4099,7 +4132,7 @@ function developersPage() {
         active = projects.filter((p) => p.status !== "Complete"),
         open = projects.flatMap((p) => projectActions(p)),
         overdue = open.filter((a) => a.due_date < todayLocal());
-      return `<section class="card developer-card" data-developer="${esc(name)}"><div class="row"><h2><button class="link" data-open-developer="${esc(name)}">${esc(name)}</button></h2><span class="pill">${projects.length} ${projects.length === 1 ? "project" : "projects"}</span></div><button class="quiet-link" data-open-developer="${esc(name)}">View actions & recommendations →</button><p class="developer-summary">${active.length} active · ${projects.length - active.length} complete · ${open.length} open actions · ${overdue.length} overdue</p>${projects.map((p) => `<div class="developer-project">${art(p)}<div><button class="link" data-developer-project="${p.id}">${esc(p.name)}</button><small>${esc(p.category)} · Target launch ${esc(p.target_launch || "2027")}</small>${projectStage(p)}<small>Final Review ${milestoneDates(p).final_review ? dateLabel(milestoneDates(p).final_review) : "Not set"}</small></div><button data-developer-project="${p.id}" aria-label="Open ${esc(p.name)} details">›</button></div>`).join("") || "<p>No projects in this quarter.</p>"}</section>`;
+      return `<section class="card developer-card" data-developer="${esc(name)}"><div class="row"><h2><button class="link" data-open-developer="${esc(name)}">${esc(name)}</button></h2><span class="pill">${projects.length} ${projects.length === 1 ? "project" : "projects"}</span></div><button class="quiet-link" data-open-developer="${esc(name)}">View actions & recommendations →</button><p class="developer-summary">${active.length} active · ${projects.length - active.length} complete · ${open.length} open actions · ${overdue.length} overdue</p>${projects.map((p) => `<div class="developer-project">${art(p)}<div><button class="link" data-developer-project="${p.id}">${esc(p.name)}</button><small>${esc(p.category)} · Target launch ${launchLabel(p)}</small>${projectStage(p)}<small>Final Review ${milestoneDates(p).final_review ? dateLabel(milestoneDates(p).final_review) : "Not set"}</small></div><button data-developer-project="${p.id}" aria-label="Open ${esc(p.name)} details">›</button></div>`).join("") || "<p>No projects in this quarter.</p>"}</section>`;
     })
     .join(
       "",
@@ -4888,6 +4921,7 @@ function hydratePreview() {
         previewSeed.projects[0].supplier_details,
     );
     p.target_launch ||= "2027";
+    p.target_launch_quarter ||= defaultLaunchQuarter(p);
   }
   if (previewData.restore_snapshot) return;
   for (const p of previewSeed.projects) {
@@ -5624,6 +5658,13 @@ api = async function previewApi(url, body, method = "POST") {
         parseMilestoneValues({ ...p, ...body });
       } catch (error) {
         previewFailure(422, error.message);
+      }
+      if (Object.hasOwn(body, "target_launch_quarter")) {
+        const lq = Number(body.target_launch_quarter), ly = Number(body.target_launch);
+        if (!Number.isInteger(lq) || lq < 1 || lq > 4 || !Number.isInteger(ly) || ly < 2026 || ly > 2035 || ly < Number(String(body.development_end).slice(0, 4)))
+          previewFailure(422, "Choose a launch quarter and year on or after development completion");
+        p.target_launch_quarter = lq;
+        p.target_launch = String(ly);
       }
       for (const key of [
         "name",
@@ -6524,9 +6565,12 @@ function restoreCapabilityGroups(groups) {
       const WEBHOOK = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/_-]+$/;
       const RANK = { "Not assessed": 0, "Within limit": 1, "At limit": 2, "Over limit": 3 };
       const plural = (n, word) => `${n} ${n === 1 ? word : word + "s"}`;
+      // A limit of 0 means "no capacity available", not "full of projects": say so plainly.
+      const noCapacity = (c) => c.project_limit === 0 && c.status === "At limit";
+      const loadText = (c) => (noCapacity(c) ? "No capacity is available for this quarter (limit 0)." : `${plural(c.scheduled, "project")} scheduled against a limit of ${c.project_limit}.`);
       const quarterOf = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d || "") ? `${d.slice(0, 4)}-Q${Math.ceil(Number(d.slice(5, 7)) / 3)}` : null);
       const emojiFor = (text) =>
-        /shortlist/i.test(text) ? "📝" : /complet/i.test(text) ? "✅" : /action/i.test(text) ? "📋" : /releas|cancel/i.test(text) ? "↩️" : /reserv|sample/i.test(text) ? "📦" : /date|due|schedule/i.test(text) ? "📅" : "📌";
+        /locked in/i.test(text) ? "🔒" : /shortlist/i.test(text) ? "📝" : /complet/i.test(text) ? "✅" : /action/i.test(text) ? "📋" : /releas|cancel/i.test(text) ? "↩️" : /reserv|sample/i.test(text) ? "📦" : /date|due|schedule/i.test(text) ? "📅" : "📌";
       const pageBase = () => `${location.origin}${location.pathname}`;
       const projectLink = (projectId) => {
         const supplier = new URLSearchParams((location.hash.split("?")[1]) || "").get("supplier") || "1";
@@ -6579,7 +6623,7 @@ function restoreCapabilityGroups(groups) {
         paint();
       }
       const capacityStatuses = () => new Map((state?.capacity || []).map((c) => [`${c.supplier_id}|${c.quarter}`, c.status]));
-      async function capture(before, beforeCap, beforeShortlist, startedAt, actor, url) {
+      async function capture(before, beforeCap, beforeShortlist, beforeStages, startedAt, actor, url) {
         if (!(settings.mock || settings.real) || !(settings.activity || settings.capacity)) return;
         const fresh = await baseApi("/api/state");
         const projects = new Map((fresh.projects || []).map((p) => [p.id, p]));
@@ -6603,6 +6647,8 @@ function restoreCapabilityGroups(groups) {
           for (const h of entries) {
             const p = projects.get(h.project_id);
             let lines = [h.message];
+            const lock = /^Reserved sample with supplier (\d+) for (.+)$/.exec(h.message || "");
+            if (lock) lines = [`Locked in capacity with ${suppliers.get(Number(lock[1]))?.name || "supplier " + lock[1]} for ${lock[2]}`];
             if (h.message === "Updated supplier shortlist") {
               const { added, removed } = shortlistChange(h.project_id);
               const named = [added.length ? `Added ${names(added)} to the shortlist` : "", removed.length ? `Removed ${names(removed)} from the shortlist` : ""].filter(Boolean);
@@ -6611,6 +6657,20 @@ function restoreCapabilityGroups(groups) {
             await post({ id: h.id, ts: Date.now(), kind: "activity", channel: "#project-activity", title: p?.name || "Project " + h.project_id,
               lines, actor, url: projectLink(h.project_id), emoji: emojiFor(lines.join(" ")), status: "" });
           }
+        // A supplier moved to Sample development but no capacity is locked in, so the schedule does not show it yet.
+        if (settings.activity)
+          for (const p of fresh.projects || [])
+            for (const [sid, d] of Object.entries(p.supplier_details || {})) {
+              if (d.removed || d.stage !== "Sample development" || beforeStages.get(`${p.id}|${sid}`) === d.stage) continue;
+              if ((fresh.reservations || []).some((r) => r.project_id === p.id && r.supplier_id === Number(sid))) continue;
+              const stamp = `stage|${p.id}|${sid}|${startedAt}`;
+              if (seen.has(stamp)) continue;
+              seen.add(stamp);
+              await post({ id: crypto.randomUUID(), ts: Date.now(), kind: "activity", channel: "#project-activity", title: p.name, emoji: "🔒",
+                lines: [`${suppliers.get(Number(sid))?.name || "Supplier " + sid} moved to Sample development, but capacity is not locked in yet.`,
+                  "Lock in capacity so this project counts toward the supplier's schedule."],
+                actor, url: projectLink(p.id), linkLabel: "Open project", status: "" });
+            }
         if (!settings.capacity) return;
         // Early warning: a supplier was shortlisted or confirmed for discussions while already full
         // in the quarter this project's sample is due. Nothing is reserved yet at this stage.
@@ -6621,7 +6681,7 @@ function restoreCapabilityGroups(groups) {
           const { added, now } = shortlistChange(pid);
           const picks = String(pid) === confirmedPid ? now.map((id) => [id, "confirmed for discussions"]) : added.map((id) => [id, "added to the shortlist"]);
           for (const [sid, what] of picks) {
-            const q = quarterOf(p.sample_due),
+            const q = launchQuarters(p)[1],
               c = (fresh.capacity || []).find((x) => x.supplier_id === sid && x.quarter === q);
             if (!c || !["At limit", "Over limit"].includes(c.status)) continue;
             const stamp = `warn|${pid}|${sid}|${q}|${c.status}|${entries[0]?.id}`;
@@ -6630,9 +6690,9 @@ function restoreCapabilityGroups(groups) {
             const name = suppliers.get(sid)?.name || "Supplier " + sid, over = c.status === "Over limit";
             await post({ id: crypto.randomUUID(), ts: Date.now(), kind: "capacity", level: over ? "over" : "at", channel: "#capacity-alerts",
               emoji: over ? "🚨" : "⚠️",
-              title: `Heads-up: ${name} is already ${over ? "over its limit" : "at capacity"} for ${q}`,
-              lines: [`${p.name} was just ${what} with ${name}. Its sample is due ${p.sample_due} (${q}).`,
-                `${plural(c.scheduled, "project")} scheduled against a limit of ${c.project_limit}. No capacity has been reserved for this project yet.`,
+              title: `Heads-up: ${name} ${over ? "is already over its limit" : noCapacity(c) ? "has no capacity available" : "is already at capacity"} for ${q}`,
+              lines: [`${p.name} was just ${what} with ${name}. Its target launch is ${quarterLabel(q)}.`,
+                `${loadText(c)} No capacity has been locked in for this project yet.`,
                 reservedList(c)].filter(Boolean),
               actor, url: supplierLink(c), linkLabel: "Open supplier", status: "" });
           }
@@ -6652,8 +6712,8 @@ function restoreCapabilityGroups(groups) {
           const level = c.status === "Over limit" ? "over" : c.status === "At limit" ? "at" : "ok";
           await post({ id: crypto.randomUUID(), ts: Date.now(), kind: "capacity", level, channel: "#capacity-alerts",
             emoji: level === "over" ? "🚨" : level === "at" ? "⚠️" : "✅",
-            title: level === "ok" ? `${name} is back within its limit for ${c.quarter}` : `${name} is ${level === "over" ? "over its limit" : "at capacity"} for ${c.quarter}`,
-            lines: [`${plural(c.scheduled, "project")} scheduled against a limit of ${c.project_limit}.`, `Triggered by ${actor}: ${trigger}`, reservedList(c)].filter(Boolean),
+            title: level === "ok" ? `${name} is back within its limit for ${c.quarter}` : `${name} ${level === "over" ? "is over its limit" : noCapacity(c) ? "has no capacity available" : "is at capacity"} for ${c.quarter}`,
+            lines: [loadText(c), `Triggered by ${actor}: ${trigger}`, reservedList(c)].filter(Boolean),
             actor, url: supplierLink(c), linkLabel: "Open supplier", status: "" });
         }
       }
@@ -6663,12 +6723,64 @@ function restoreCapabilityGroups(groups) {
         const before = isWrite ? new Set((state?.history || []).map((h) => h.id)) : null;
         const beforeCap = isWrite ? capacityStatuses() : null;
         const beforeShortlist = isWrite ? new Map((state?.projects || []).map((p) => [p.id, [...(p.shortlist || [])]])) : null;
+        const beforeStages = isWrite ? new Map((state?.projects || []).flatMap((p) => Object.entries(p.supplier_details || {}).map(([sid, d]) => [`${p.id}|${sid}`, d.stage]))) : null;
         const startedAt = Math.floor(Date.now() / 1000) - 2,
           actor = isWrite ? currentDemoActor() : "";
         const result = await baseApi(url, body, method); // a failed save throws here: nothing is posted
-        if (isWrite) capture(before, beforeCap, beforeShortlist, startedAt, actor, url).catch(() => {}); // Slack trouble never affects the app
+        if (isWrite) capture(before, beforeCap, beforeShortlist, beforeStages, startedAt, actor, url).catch(() => {}); // Slack trouble never affects the app
         return result;
       };
+
+      // "Lock in capacity": one step that places the sample order, so the project counts as scheduled with that supplier.
+      function openLock(sid) {
+        const p = selected(), s = state.suppliers.find((x) => x.id === sid), dialog = $("#planning-dialog");
+        if (!p || !s || !dialog) return;
+        const win = launchQuarters(p).filter((q) => state.quarters.includes(q)),
+          options = win.length ? win : state.quarters,
+          guess = options.includes(launchQuarters(p)[1]) ? launchQuarters(p)[1] : options[0];
+        dialog.innerHTML = `<h2 id="dialog-title">Lock in capacity?</h2><p>${esc(p.name)} · ${esc(s.name)}</p>
+          <label for="lock-quarter">Quarter</label><select id="lock-quarter">${options.map((q) => `<option value="${esc(q)}"${q === guess ? " selected" : ""}>${esc(quarterLabel(q))}${q === launchQuarters(p)[1] ? " (target launch)" : ""}</option>`).join("")}</select>
+          <div id="lock-impact"></div><p id="dialog-error" role="alert"></p>
+          <div class="row"><button type="button" id="lock-cancel">Cancel</button><button type="button" class="primary" id="lock-confirm">Lock in capacity</button></div>`;
+        const rowsFor = (q) => state.reservations.filter((r) => r.supplier_id === sid && r.quarter === q);
+        const paintImpact = () => {
+          const q = $("#lock-quarter").value, rows = rowsFor(q), c = state.capacity.find((x) => x.supplier_id === sid && x.quarter === q);
+          const already = rows.some((r) => r.project_id === p.id);
+          const after = already || !c ? c?.scheduled ?? 0 : Math.max(...monthlyBranchLoad(q, [...rows, { project_id: p.id }], state.projects).map((m) => m.scheduled));
+          const lim = c?.project_limit ?? null;
+          const note = already ? "This project already has capacity locked in with this supplier for this quarter."
+            : lim === null ? `Capacity is not assessed for ${q}. Confirm availability with the supplier.`
+            : lim === 0 ? `${s.name} has no capacity available in ${q} (limit 0). This is a planning warning and does not block you.`
+            : after > lim ? `This goes over the limit of ${lim}. It is a planning warning and does not block you; discuss timing with the supplier.`
+            : `There is room within the limit of ${lim}.`;
+          $("#lock-impact").innerHTML = `<div class="split"><div class="metric"><small>Scheduled now</small><strong>${c?.scheduled ?? 0} of ${lim ?? "not assessed"}</strong></div><div class="metric"><small>After locking in</small><strong>${after} of ${lim ?? "not assessed"}</strong></div></div><div class="callout">${esc(note)}</div>`;
+          $("#lock-confirm").disabled = already;
+        };
+        paintImpact();
+        $("#lock-quarter").onchange = paintImpact;
+        $("#lock-cancel").onclick = () => dialog.close();
+        $("#lock-confirm").onclick = async () => {
+          const q = $("#lock-quarter").value, btn = $("#lock-confirm");
+          btn.disabled = true;
+          try {
+            await api("/api/reservations", { project_id: p.id, supplier_id: sid, quarter: q, expected_count: rowsFor(q).length });
+            state = await api("/api/state");
+            dialog.close();
+            render();
+            showNotice(`Capacity locked in. ${p.name} now counts as scheduled with ${s.name} for ${q}.`);
+          } catch (err) {
+            $("#dialog-error").textContent = err.message;
+            btn.disabled = false;
+          }
+        };
+        dialog.showModal();
+      }
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest ? e.target.closest("[data-lock]") : null;
+        if (!b || b.disabled) return;
+        e.preventDefault();
+        openLock(Number(b.dataset.lock));
+      });
 
       const style = document.createElement("style");
       style.textContent = `
@@ -6729,7 +6841,7 @@ function restoreCapabilityGroups(groups) {
               const { title, lines } = parts(m);
               return `<div class="sd-msg${m.level ? " sd-" + m.level : ""}"><div class="sd-avatar" aria-hidden="true">B</div><div><div><span class="sd-name">Branch</span><span class="sd-app">APP</span><span class="sd-chan">${html(m.channel || "")}</span><span class="sd-time">${html(new Date(m.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</span></div><div>${m.emoji} <b>${html(title)}</b></div>${lines.map((l) => `<div class="sd-line">${html(l)}</div>`).join("")}<div class="sd-status">${html(m.actor)} · ${m.url ? `<a href="${html(m.url)}">${html(m.linkLabel || "Open in Branch")}</a> · ` : ""}fictional demo${m.status ? " · " + html(m.status) : ""}</div></div></div>`;
             }).join("")
-          : `<div class="sd-empty">No messages yet. Reserve a sample with a supplier that is close to its limit, or create or complete an action.</div>`;
+          : `<div class="sd-empty">No messages yet. Lock in capacity with a supplier that is close to its limit, or create or complete an action.</div>`;
       }
       toggle.onclick = () => {
         open = !open;
@@ -6771,11 +6883,11 @@ function restoreCapabilityGroups(groups) {
         if (!full.length)
           return post({ ...base, level: "ok", emoji: "✅", title: "Capacity summary: no suppliers at or over their limit", lines: ["Every supplier with an assessed limit is within it."] });
         const over = full.filter((c) => c.status === "Over limit").length;
-        const line = (c) => `${c.status === "Over limit" ? "🚨" : "⚠️"} ${suppliers.get(c.supplier_id) || "Supplier " + c.supplier_id} · ${c.quarter}: ${c.status} (${plural(c.scheduled, "project")} against a limit of ${c.project_limit})`;
+        const line = (c) => `${c.status === "Over limit" ? "🚨" : "⚠️"} ${suppliers.get(c.supplier_id) || "Supplier " + c.supplier_id} · ${c.quarter}: ${noCapacity(c) ? "No capacity available (limit 0)" : `${c.status} (${plural(c.scheduled, "project")} against a limit of ${c.project_limit})`}`;
         const shown = full.slice(0, 5).map(line);
         if (full.length > 5) shown.push(`…and ${full.length - 5} more`);
         await post({ ...base, level: over ? "over" : "at", emoji: over ? "🚨" : "⚠️",
-          title: `Capacity summary: ${plural(full.length, "supplier quarter")} at or over limit`, lines: shown });
+          title: `Capacity summary: ${plural(full.length, "supplier quarter")} with no room left`, lines: shown });
       };
       $$("sd-test").onclick = () => {
         save();
