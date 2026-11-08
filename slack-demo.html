@@ -6715,7 +6715,7 @@ function restoreCapabilityGroups(groups) {
           <label class="sd-real-only"><input type="checkbox" id="sd-real"> Also post to my own Slack workspace</label>
           <input type="text" id="sd-relay" class="sd-real-only" autocomplete="off" placeholder="Relay URL (recommended): https://…workers.dev/event" aria-label="Relay URL">
           <input type="password" id="sd-url" class="sd-real-only" autocomplete="off" placeholder="Or one webhook URL for a quick test: https://hooks.slack.com/services/…" aria-label="Slack incoming webhook URL">
-          <div class="sd-row"><button type="button" id="sd-test">Send test message</button><button type="button" id="sd-clear">Clear</button></div>
+          <div class="sd-row"><button type="button" id="sd-test">Send test message</button><button type="button" id="sd-summary">Send capacity summary now</button><button type="button" id="sd-clear">Clear</button></div>
           <p id="sd-note">With a relay, capacity alerts and project activity go to their own Slack channels and no secret lives in this browser. A single webhook posts everything to one channel and is kept in this browser only. Use a practice workspace.</p>
         </div>
         <div id="sd-feed" aria-live="polite"></div>`;
@@ -6754,6 +6754,28 @@ function restoreCapabilityGroups(groups) {
         feed = [];
         store(FEED_KEY, feed);
         paint();
+      };
+      // One message listing every supplier that is at or over its limit right now (a snapshot, not a change).
+      $$("sd-summary").onclick = async () => {
+        save();
+        const base = { id: crypto.randomUUID(), ts: Date.now(), kind: "capacity", channel: "#capacity-alerts", actor: currentDemoActor(), url: pageBase(), linkLabel: "Open Branch", status: "" };
+        let fresh;
+        try {
+          fresh = await baseApi("/api/state");
+        } catch {
+          return post({ ...base, level: "at", emoji: "⚠️", title: "Capacity summary unavailable", lines: ["Branch could not read the current capacity data."] });
+        }
+        const suppliers = new Map((fresh.suppliers || []).map((s) => [s.id, s.name]));
+        const full = (fresh.capacity || []).filter((c) => RANK[c.status] >= 2)
+          .sort((x, y) => RANK[y.status] - RANK[x.status] || String(x.quarter).localeCompare(String(y.quarter)) || (suppliers.get(x.supplier_id) || "").localeCompare(suppliers.get(y.supplier_id) || ""));
+        if (!full.length)
+          return post({ ...base, level: "ok", emoji: "✅", title: "Capacity summary: no suppliers at or over their limit", lines: ["Every supplier with an assessed limit is within it."] });
+        const over = full.filter((c) => c.status === "Over limit").length;
+        const line = (c) => `${c.status === "Over limit" ? "🚨" : "⚠️"} ${suppliers.get(c.supplier_id) || "Supplier " + c.supplier_id} · ${c.quarter}: ${c.status} (${plural(c.scheduled, "project")} against a limit of ${c.project_limit})`;
+        const shown = full.slice(0, 5).map(line);
+        if (full.length > 5) shown.push(`…and ${full.length - 5} more`);
+        await post({ ...base, level: over ? "over" : "at", emoji: over ? "🚨" : "⚠️",
+          title: `Capacity summary: ${plural(full.length, "supplier quarter")} at or over limit`, lines: shown });
       };
       $$("sd-test").onclick = () => {
         save();
