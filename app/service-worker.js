@@ -1,5 +1,5 @@
 // Branch app service worker. Scope is this folder only, so the original app one level up is never touched.
-const CACHE = "branch-app-v1";
+const CACHE = "branch-app-v2";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
