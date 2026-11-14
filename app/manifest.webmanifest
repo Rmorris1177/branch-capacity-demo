@@ -1,7 +1,7 @@
 {
-  "name": "Branch Capacity Demo",
+  "name": "Branch New Product Development Tracker",
   "short_name": "Branch",
-  "description": "Fictional supplier capacity and development planning demo with Slack alerts.",
+  "description": "Fictional product development, supplier capacity, and weekly project tracking demo.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
